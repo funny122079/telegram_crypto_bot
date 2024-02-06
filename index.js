@@ -9,6 +9,7 @@ const {ethers} = require('ethers');
 const {Web3} = require('web3');
 const { ChainId, Token, WETH, Fetcher, Route } = require('@uniswap/sdk');
 const constants = require('./constants');
+const modules = require('./modules');
 
 // const abi = {
 //     token: require('./abi/abi_token.json'),
@@ -22,14 +23,20 @@ const constants = require('./constants');
 const userStates = new Map();
 
 //This is my wallet imported by telegram bot.
-const myLocalPrivateKey = '0xf43b8e706477686f44c049fb85c8ea59273fcd3f2947941ee5ea6b2ad3b45ba5';
-const myLocalAddress = '0xb03314c6cdaa5c34b9ccc4f1add7e9da9ef700be';
+const myLocalPrivateKey = '1543c61945e50c7a02d111e052f4179df92e28b72d77d34ae3e5170127f07c60';
+const myLocalAddress = '0x34581ada421Fc3d38ec8d695a742A528f7066a49';
 
 //This is Metamask wallet on Chrome browser.
 const testMetaMaskPrivateKey = '0eb867a9a78cceefbc5cf4add6de45ff69337a63b641c5237e0110b7eb30651f';
 const testMetaMaskAddress = '0x0086bDBD8475be37eBB584e0e2dc36A8c08e183E';
 
-let senderPrivateKey, receiverAddress, amount;
+const erc20TokenAbi = [
+// ERC-20 standard functions
+    'function balanceOf(address) view returns (uint256)',
+    'function symbol() view returns (string)',
+];
+
+let senderPrivateKey, recipientAddress, amount;
 let netType = 'testnet';
 let chainPlatform = 'Ethereum';
 let nativeToken = 'ETH';
@@ -37,6 +44,26 @@ let tokenToSellAddress; // e.g., ETH
 let tokenToBuyAddress; // e.g., DAI
 let amountToSwap;
 let strategyNo;
+let myWalletAddress;
+let myWalletPrivateKey;
+let myWalletBalance;
+let amountInWei;
+// const store = {
+//     '1000': {
+//         wallet
+//     }
+// }
+let chat = {
+    chatId:'string',
+    wallet: {
+        publicAddress: 'string',
+        privateKey: 'string',
+    },
+    tx: {
+        id: 'integer',
+        senderAddress: 'string'
+    }
+}
 
 const uniswapRouterAddress = '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D';
 const desiredBuyPrice = 1000; // Desired buy price in ETH
@@ -49,6 +76,13 @@ const web3 = new Web3(new Web3.providers.HttpProvider(rpcUrl));
 const dashboardMessage = 'What do you want to do with the bot?';
 
 bot.onText(/\/start/, (msg) => {
+    // if (!store[msg.chat.id]) {
+    //     store[msg.chat.id] = {
+    //         id: msg.chat.id
+    //     }
+    // }
+    // const chat = store[msg.chat.id];
+
     const chatId = msg.chat.id;
 
     const selectNetKeyboard = {
@@ -127,13 +161,15 @@ bot.on('callback_query', (callbackQuery) => {
             buy(chatId, param1);
             break;
         case 'input-buy-token':
-            inputBuyToken(chatId, param1, param2);
+            inputBuyToken(chatId, param1);
             break;
         case 'custom-buy-token':
             customBuyToken(chatId, param1);
             break;
         case 'confirm-buy':
-            bot.sendMessage(chatId, 'Start buying...');
+            modules.buy(myWalletPrivateKey, myWalletAddress, constants.daiTokenAddress, '10', '300000', '0.001')
+                .then((result) => bot.sendMessage(chatId, result))
+                .catch((error) => bot.sendMessage(chatId, `${error.message}`));
             break;
         case 'cancel-buy':
             bot.deleteMessage(chatId, callbackQuery.message.message_id)
@@ -143,23 +179,26 @@ bot.on('callback_query', (callbackQuery) => {
             sell(chatId, param1);
             break;
         case 'input-sell-token':
-            inputSellToken(chatId, param1, param2);
+            inputSellToken(chatId, param1);
             break;
         case 'input-receive-token':
-            inputReceiveToken(chatId, param1, param2, param3);
+            inputReceiveToken(chatId, param1, param2);
             break;
         case 'custom-sell-token':
             customSellToken(chatId, param1);
             break;
         case 'confirm-sell':
-            bot.sendMessage(chatId, 'Start selling...');
+            modules.sell(myWalletPrivateKey, myWalletAddress, constants.daiTokenAddress, '10', '300000', '0.001')
+                .then((result) => bot.sendMessage(chatId, result))
+                .catch((error) => bot.sendMessage(chatId, `${error.message}`));
             break;
         case 'cancel-sell':
             bot.deleteMessage(chatId, callbackQuery.message.message_id)
                 .then(() => console.log('Message deleted successfully!'));
             break;
         case 'check-balance':
-            checkBalance(chatId);
+            modules.getBalance(myWalletAddress)
+                .then((balance) => bot.sendMessage(chatId, balance + nativeToken));
             break;
         case 'switch-net':
             switchNet(chatId);
@@ -174,10 +213,13 @@ bot.on('callback_query', (callbackQuery) => {
             trading(chatId);
             break;
         case 'confirm-transfer':
-            doTransfer(chatId);
+            modules.transfer('0eb867a9a78cceefbc5cf4add6de45ff69337a63b641c5237e0110b7eb30651f', '0x0086bDBD8475be37eBB584e0e2dc36A8c08e183E', myWalletAddress, amountInWei)
+                .then((result) => bot.sendMessage(chatId, result))
+                .catch((error) => bot.sendMessage(chatId, `${error.message}`));
             break;
         case 'cancel-transfer':
-            deleteMessage(chatId);
+            deleteMessage(chatId, callbackQuery.message.message_id)
+                .then(() => console.log('Message deleted successfully!'));;
             break;
         case 'token-to-sell':
             setTokenToSell(chatId, param1);
@@ -187,7 +229,11 @@ bot.on('callback_query', (callbackQuery) => {
             break;
         case 'confirm-swap':
             bot.sendMessage(chatId, 'Start trading...');
-            break;            
+            break;       
+        case 'token-balances':
+            modules.getTokenBalances(chatId)
+                .then((result) => bot.sendMessage(chatId, result));
+            break;   
         default:
             break;
     }
@@ -225,7 +271,7 @@ bot.on('message', (message) => {
             amount = new BigNumber(new BigNumber(message.text).toFixed(8, 0));
             if (!amount.isNaN() && amount.isGreaterThan(new BigNumber(0))) {
                 bot.sendMessage(chatId, 'You entered: *' + amount + '* for transferring.', { parse_mode: 'Markdown'});
-                const messageText3 = '*Confirm Transfer*\n Sending *<' + amount + 'ETH>* to *<' + receiverAddress + '>*';
+                const messageText3 = '*Confirm Transfer*\n Sending *<' + amount + 'ETH>* to *<' + recipientAddress + '>*';
                 const confirmKeyboard = {
                     inline_keyboard: [
                         [
@@ -306,24 +352,27 @@ function selectChain(chatId, network, nativeToken) {
 }
 
 //function to generate wallet
-function createWallet(chatId) {
+async function createWallet(chatId) {
     const wallet = IS_TEST ? new ethers.Wallet(myLocalPrivateKey) : ethWallet.default.generate();
     const address = IS_TEST ? wallet.address : wallet.getAddressString(); 
     const privateKey = IS_TEST ? myLocalPrivateKey : wallet.getPrivateKeyString();
 
-    walletArray[address] = { address: address, privateKey: privateKey, chain: chainPlatform, nativeToken: nativeToken };
-    
+    myWalletAddress = address;
+    myWalletPrivateKey = privateKey;
+
+    const balance = await modules.getBalance(myWalletAddress);
+            
     const messageText = '*Wallet Generated Successfully!*\n' + 
-        '*- Address:*\n' + walletArray[address].address + '\n\n' + 
-        '*- Balance:* 0 ETH\n' +
+        '*- Address:*\n' + myWalletAddress + '\n\n' + 
+        '*- Balance:* ' + balance + nativeToken + '\n' +
         'What do you want to do with the bot?';
 
     const mainMenuKeyboard = {
         inline_keyboard: [
-            [{ text: 'Transfer', callback_data: 'transfer:' + address}, { text: 'Token Balances', callback_data: 'token-balances:' + address}], 
-            [{ text: 'Buy Tokens', callback_data: 'buy:' + address}, { text: 'Sell Tokens', callback_data: 'sell:' + address}], 
-            [{ text: 'Buy Limit', callback_data: 'buy-limit:' + address}, { text: 'Sell Limit', callback_data: 'sell-limit:' + address}], 
-            [{ text: 'Settings', callback_data: 'setting:' + address}],
+            [{ text: 'Transfer', callback_data: 'transfer'}, { text: 'Token Balances', callback_data: 'token-balances'}], 
+            [{ text: 'Buy Tokens', callback_data: 'buy'}, { text: 'Sell Tokens', callback_data: 'sell'}], 
+            [{ text: 'Buy Limit', callback_data: 'buy-limit'}, { text: 'Sell Limit', callback_data: 'sell-limit'}], 
+            [{ text: 'Settings', callback_data: 'setting'}],
         ],
     };
     
@@ -367,65 +416,33 @@ function selectChain(chatId, type, name) {
     bot.sendMessage(chatId, messageText, { parse_mode:'Markdown', reply_markup: keyboard });
 }
 
-//function to get wallet information
-async function checkBalance(chatId) {
-    try {
-        const balanceWei = await web3.eth.getBalance(address);
-
-        const balanceEther = web3.utils.fromWei(balanceWei, 'ether');
-        console.log(balanceWei);
-        bot.sendMessage(chatId, `*Balance for address * ${address}: \n ${balanceEther} ETH`, { parse_mode: 'Markdown' });
-    } catch (error) {
-        bot.sendMessage(chatId, 'Error fetching wallet information. Please try again.');
-        console.log(error.code);         
-        console.log(error.message);
-    }
-}
-
 function transfer(chatId) {
     bot.sendMessage(chatId, 'Please reply with the address to send:');
-
-    // Set up a listener for the next message
-    bot.once('message', (toAddressMessage) => {
-        receiverAddress = IS_TEST ? testMetaMaskAddress : toAddressMessage.text.trim();
+    bot.once('message', (address) => {
+        recipientAddress = address.text.trim();
         bot.sendMessage(chatId, 'Please reply with the amount to send:');
-        userStates.set(chatId, 'confirmTransfer');
+
+        bot.once('message', (amount) => {
+            amount = new BigNumber(new BigNumber(amount.text).toFixed(8, 0));
+            if (!amount.isNaN() && amount.isGreaterThan(new BigNumber(0))) {
+                bot.sendMessage(chatId, 'You entered: *' + amount + '* for transferring.', { parse_mode: 'Markdown'});
+                const messageText3 = '*Confirm Transfer*\n Sending *<' + amount + 'ETH>* to *<' + recipientAddress + '>*';
+                const confirmKeyboard = {
+                    inline_keyboard: [
+                        [
+                            { text: '✅ Confirm', callback_data: 'confirm-transfer'},
+                            { text: '❌ Cancel', callback_data: 'cancel-transfer' }
+                        ],
+                    ],
+                };
+
+                amountInWei = Web3.utils.toWei(amount.toFixed(8, 0), 'ether');
+                bot.sendMessage(chatId, messageText3, { parse_mode: 'Markdown', reply_markup: confirmKeyboard });
+            } else {
+                bot.sendMessage(chatId, 'Invalid amount! Please enter again.');
+            }
+        });
     });
-}
-
-async function doTransfer(chatId) {
-    try {
-       // const amount = amountMessage.text.trim();
-        const amountInWei = Web3.utils.toWei(amount.toFixed(8, 0), 'ether');
-
-        const nonce = await web3.eth.getTransactionCount(address) ;
-        const nextNonce = nonce + BigInt(1);
-        //const nextNonce = nonce + BigInt(1);
-        
-
-        const gasPrice = await web3.eth.getGasPrice();
-        console.warn(gasPrice);
-       
-        const transaction = {
-            from: address,   
-            to: receiverAddress,
-            value: amountInWei,
-            //gasPrice: "4100000000",
-            gasPrice: gasPrice,
-            gasLimit: "35000", // Gas limit for a standard ETH transfer
-            nonce: nonce
-        };
-        // Sign the transaction
-        const signedTransaction = await web3.eth.accounts.signTransaction(transaction, myLocalPrivateKey);
-        const transactionReceipt = await web3.eth.sendSignedTransaction(signedTransaction.rawTransaction);
-        
-        console.log(`Transaction Hash: https://goerli.etherscan.io/tx/${transactionReceipt.transactionHash}`);
-        bot.sendMessage(chatId, `Transaction Hash: https://goerli.etherscan.io/tx/${transactionReceipt.transactionHash}`);
-        console.warn("Sent!!!!");
-    } catch(error) {
-        console.error('Error:', error);
-        bot.sendMessage(chatId, error.message);
-    }
 }
 
 //function to select wallet type from wallet type list
@@ -461,68 +478,6 @@ function trading(chatId) {
     };
 
     bot.sendMessage(chatId, messageText1, { parse_mode: 'Markdown', reply_markup: keyboard1 });
-}
-
-//function for trading
-async function doSwap(chatId) {
-    try {
-        const tokenToBuy = await Fetcher.fetchTokenData(1, tokenToBuyAddress);
-        const tokenToSell = await Fetcher.fetchTokenData(1, tokenToSellAddress);
-    
-        const pair = await Fetcher.fetchPairData(tokenToBuy, tokenToSell);
-        const route = new Route([pair], tokenToSell);
-    
-        const currentPrice = parseFloat(route.midPrice.toSignificant(6));
-        
-        console.log(`Current Price: ${currentPrice} ETH`);
-    
-        if (currentPrice <= desiredBuyPrice) {
-            const amountToSell = ethers.utils.parseUnits('0.0001', 18); // Replace with the amount of tokens you want to sell
-            const slippageTolerance = new Percent('50', '10000'); // 0.5% slippage tolerance
-            const trade = new Trade(route, new TokenAmount(tokenToSell, amountToSell), TradeType.EXACT_INPUT);
-
-            // Check if trade is within slippage tolerance
-            if (trade.slippageTolerance.lessThan(slippageTolerance)) {
-                console.log('Trade within slippage tolerance. Executing trade...');
-    
-                // Execute the trade (buy tokens)
-                const uniswapRouter = new ethers.Contract(uniswapRouterAddress, ['function swapExactTokensForTokens(uint256,uint256,address[],address,uint256)'], wallet);
-                
-                // Set up parameters for swapExactTokensForTokens
-                const path = [tokenToSellAddress, tokenToBuyAddress];
-                const deadline = Math.floor(Date.now() / 1000) + 60 * 10; // 10 minutes from now
-    
-                const tx = await uniswapRouter.swapExactTokensForTokens(
-                    amountToSell,
-                    0, // Minimum amount of tokens to receive (0 for any)
-                    path,
-                    wallet.address,
-                    deadline
-                );
-    
-                console.log(`Transaction Hash: ${tx.hash}`);
-            } else {
-                console.log('Trade exceeds slippage tolerance. Skipping trade.');
-            }
-        } else if (currentPrice >= desiredSellPrice) {
-          // Implement your sell order logic here
-       
-          console.log('Selling...');
-        } else if (stopLossPercentage > 0) {
-          const stopLossPrice = desiredBuyPrice - (desiredBuyPrice * stopLossPercentage) / 100;
-          if (currentPrice <= stopLossPrice) {
-            // Implement your stop-loss logic here
-      
-            console.log('Stop Loss Triggered...');
-          }
-        } else {
-          console.log('No trading action taken. Price is within desired range.');
-        }
-      } catch (error) {
-        console.error('Error:', error);
-        console.error('Error:', error.message);
-        bot.sendMessage(chatId, error.message);
-      }
 }
 
 async function fetchPair(tokenToBuy, tokenToSell) {
@@ -597,19 +552,18 @@ function setTokenToBuy(chatId, tokenToBuy) {
 }
 
 async function buy(chatId, address) {
-    const transactionId = await createTransaction(address, 'buy');
     const messageText = 'Please select buy amount:';
 
     const buyAmountKeyboard = {
         inline_keyboard: [
             [
-                { text: '0.1' + walletArray[address].nativeToken, callback_data: 'input-buy-token:0.1:' + transactionId },
-                { text: '0.3' + walletArray[address].nativeToken, callback_data: 'input-buy-token:0.3:' + transactionId },
-                { text: '0.5' + walletArray[address].nativeToken, callback_data: 'input-buy-token:0.5:' + transactionId },
+                { text: '0.1' + nativeToken, callback_data: 'input-buy-token:0.1' },
+                { text: '0.3' + nativeToken, callback_data: 'input-buy-token:0.3' },
+                { text: '0.5' + nativeToken, callback_data: 'input-buy-token:0.5' },
             ],
             [
-                { text: '1' + walletArray[address].nativeToken, callback_data: 'input-buy-token:1:' + transactionId },
-                { text: 'Custom:--' + walletArray[address].nativeToken, callback_data: 'custom-buy-token:' + transactionId },
+                { text: '1' + nativeToken, callback_data: 'input-buy-token:1' },
+                { text: 'Custom:--' + nativeToken, callback_data: 'custom-buy-token' },
             ],
         ],
     };
@@ -617,16 +571,15 @@ async function buy(chatId, address) {
     bot.sendMessage(chatId, messageText, { parse_mode: 'Markdown', reply_markup: buyAmountKeyboard });
 }
 
-function inputBuyToken(chatId, amount, txId) {
+function inputBuyToken(chatId, amount) {
     bot.sendMessage(chatId, 'Please input the token address to buy:');
 
     bot.once('message', (buyTokenMessage) => {
         const buyToken = buyTokenMessage.text.trim();
-        const tx = transactions[txId];
         const messageText = '*======= Please confirm the information ==========*\n' + 
             '*BuyTokenAddress: *' + buyToken +
             '\n*Amount: *' + amount + 
-            '\n*Buy with: *' + walletArray[tx.senderAddress].nativeToken +
+            '\n*Buy with: *' + nativeToken +
             '\nDo you really buy token?';
         
         const confirmKeyboard = {
@@ -642,7 +595,7 @@ function inputBuyToken(chatId, amount, txId) {
     });
 }
 
-function customBuyToken(chatId, amount, txId) {
+function customBuyToken(chatId) {
     bot.sendMessage(chatId, 'Please input the custom buy amount:');
 
     bot.once('message', (buyTokenAmountMessage) => {
@@ -652,11 +605,10 @@ function customBuyToken(chatId, amount, txId) {
 
         bot.once('message', (buyTokenMessage) => {
             const buyToken = buyTokenMessage.text.trim();
-            const tx = transactions[txId];
             const messageText = '*======= Please confirm the information ==========*\n' + 
                 '*BuyTokenAddress: *' + buyToken +
-                '\n*Amount: *' + amount + 
-                '\n*Buy with: *' + walletArray[tx.senderAddress].nativeToken + 
+                '\n*Amount: *' + buyTokenAmount + 
+                '\n*Buy with: *' + nativeToken + 
                 '\nDo you really buy token?';
             
             const confirmKeyboard = {
@@ -673,21 +625,20 @@ function customBuyToken(chatId, amount, txId) {
     });
 }
 
-async function sell(chatId, address) {
-    const transactionId = await createTransaction(address, 'sell');
+async function sell(chatId) {
     const messageText = 'Please select sell amount:';
 
     const sellAmountKeyboard = {
         inline_keyboard: [
             [
-                { text: '10%', callback_data: 'input-sell-token:10:' + transactionId },
-                { text: '15%', callback_data: 'input-sell-token:15:' + transactionId },
-                { text: '25%', callback_data: 'input-sell-token:25:' + transactionId },
+                { text: '10%', callback_data: 'input-sell-token:10'},
+                { text: '15%', callback_data: 'input-sell-token:15' },
+                { text: '25%', callback_data: 'input-sell-token:25' },
             ],
             [
-                { text: '50%', callback_data: 'input-sell-token:50:' + transactionId },
-                { text: '75%', callback_data: 'input-sell-token:75:' + transactionId },
-                { text: '100%', callback_data: 'input-sell-token:100:' + transactionId },
+                { text: '50%', callback_data: 'input-sell-token:50' },
+                { text: '75%', callback_data: 'input-sell-token:75' },
+                { text: '100%', callback_data: 'input-sell-token:100' },
             ],
         ],
     };
@@ -701,8 +652,8 @@ function inputSellToken(chatId, amount, txId) {
     const receiveTokenKeyboard = {
         inline_keyboard: [
             [
-                { text: 'ETH', callback_data: 'input-receive-token:ETH:' + amount + ':' + txId },
-                { text: 'USDC', callback_data: 'input-receive-token:USDC:' + amount + ':' + txId }
+                { text: 'ETH', callback_data: 'input-receive-token:ETH:' + amount },
+                { text: 'USDC', callback_data: 'input-receive-token:USDC:' + amount }
             ]
         ],
     };
@@ -710,10 +661,10 @@ function inputSellToken(chatId, amount, txId) {
     bot.sendMessage(chatId, messageText, { parse_mode: 'Markdown', reply_markup: receiveTokenKeyboard });
 }
 
-function inputReceiveToken(chatId, receiveToken, amount, txId) {
+function inputReceiveToken(chatId, receiveToken, amount) {
     const messageText = '*======= Please confirm the information ==========*\n' + 
         '*ReceiveToken: *' + receiveToken +
-        '\n*Amount: *' + amount + 
+        '\n*Amount: *' + amount + '%' +
         '\nDo you really  token?';
     
     const confirmKeyboard = {
@@ -742,4 +693,30 @@ function createTransaction(address, type) {
 
 }
 
+async function getERC20TokenContracts(walletAddress) {
+    try {
+      const contract = new web3.eth.Contract(erc20TokenAbi);
+  
+      // Use the Transfer event to identify ERC-20 token contracts
+      const transferEvents = await contract.getPastEvents('allEvents', {
+        fromBlock: 0,
+        toBlock: 'latest',
+        filter: { from: walletAddress },
+      });
+  
+      const uniqueTokenContracts = Array.from(
+        new Set(transferEvents.map(event => event.address))
+      );
+  
+      // Create ERC-20 token contract instances
+      const tokenContracts = uniqueTokenContracts.map(address => {
+        return new ethers.Contract(address, erc20TokenAbi, new ethers.Wallet(myWalletPrivateKey));
+      });
+  
+      return tokenContracts;
+    } catch (error) {
+      console.error('Error:', error);
+      return [];
+    }
+  }
 
