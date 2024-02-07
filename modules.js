@@ -1,20 +1,13 @@
 const {Web3, eth} = require('web3');
 const {ethers} = require('ethers');
+const Moralis = require('moralis');
 const BigNumber = require("bignumber.js");
-const { ChainId, Token, WETH, Fetcher, Route } = require('@uniswap/sdk');
 const constants = require('./constants');
-
-const abi = {
-    token: require('./abi/abi_token.json'),
-    factory:require('./abi/abi_uniswap_v2_factory'),
-    factory1:require('./abi/abi_uniswap_v2').factory,
-    router: require('./abi/abi_uniswap_v2_router_all.json'),
-    pair: require('./abi/abi_uniswap_v2_pair.json'),
-}
+const abi = require("./abi.json");
 
 const rpcUrl = constants.rpcUrl;
 const web3 = new Web3(new Web3.providers.HttpProvider(rpcUrl));
-const uniswapRouterAddress = '0xE592427A0AEce92De3Edee1F18E0157C05861564';
+const contractAddress = constants.contractAddress;
 
 let getBalance = async (address) => { 
     try {
@@ -22,6 +15,7 @@ let getBalance = async (address) => {
         console.log(balanceWei);
 
         const balanceEther = web3.utils.fromWei(balanceWei, 'ether');
+        console.warn(balanceEther)
         return balanceEther;
     } catch (error) {      
         console.log(error.message);
@@ -31,27 +25,15 @@ let getBalance = async (address) => {
 
 let getTokenBalances = async () => {
     try {
-        console.log('Getting balance...');
-        const provider = new ethers.providers.JsonRpcProvider('https://ropsten.infura.io');
-        const wallet = new ethers.Wallet(myWalletPrivateKey, provider); // Replace with your private key
+        await Moralis.default.start({
+            evmApiBaseUrl:'https://deep-index.moralis.io/api/v2.2/',
+            apiKey: constants.moralis_api_key
+        });
 
-        // Get the list of ERC-20 token contracts
-        const tokensToCheck = [
-            { address: '0x2170Ed0880ac9A755fd29B2688956BD959F933F8', name: 'ETH'},
-            { address: '0x6B175474E89094C44Da98b954EedeAC495271d0F', name: 'DAI'}
-        ];
-
-        const balanceMessageText = '';
-
-        for (const token of tokensToCheck) {
-            const tokenContract = new ethers.Contract(token.address, erc20TokenAbi, wallet);
-            const balance = await tokenContract.balanceOf(myWalletAddress);
-            const symbol = await tokenContract.symbol();
-
-            balanceMessageText += `Token: ${symbol}, Balance: ${balance.toString()}\n`;
-            console.log(`Token: ${symbol}, Balance: ${balance.toString()}`);
-        }
-        return balanceMessageText;
+        const response = await Moralis.default.EvmApi.token.getWalletTokenBalances({
+            'address' : '0x1f9090aaE28b8a3dCeaDf281B0F12828e676c326'
+        });
+        console.log('Success...' + response);
     } catch (error) {
         console.error('Error:', error.message);
         return error.message;
@@ -78,8 +60,8 @@ let transfer = async (senderPrivateKey, senderAddress, recipientAddress, amountI
         // Sign the transaction
         const signedTransaction = await web3.eth.accounts.signTransaction(transaction, senderPrivateKey);
         const transactionReceipt = await web3.eth.sendSignedTransaction(signedTransaction.rawTransaction);
-        
-        const explorerUrl = `Transaction Hash: https://goerli.etherscan.io/tx/${transactionReceipt.transactionHash}`;
+        console.log(transactionReceipt);
+        const explorerUrl = `Transaction Hash: https://bscscan.com/tx/${transactionReceipt.transactionHash}`;
         console.log(explorerUrl);
         console.warn("Sent!!!!");
         return explorerUrl;
@@ -89,92 +71,81 @@ let transfer = async (senderPrivateKey, senderAddress, recipientAddress, amountI
     }
 }
 
-let buy = async (senderPrivateKey, senderAddress, tokenAddress, slippage, gas_price, ethAmount, max_priority_fee = '50000', auto = 0, type = 0, base_gas_multiple = 0) => { 
-    try {
-        amount = new BigNumber(new BigNumber(ethAmount).toFixed(8, 0));
+let buy = async (senderPrivateKey, tokenAmount) => { 
+  try {
+      const provider = new ethers.JsonRpcProvider(rpcUrl);
+      const wallet = new ethers.Wallet(
+          `0x${senderPrivateKey}`,
+          provider
+      );
 
-        const wallet = new ethers.Wallet(senderPrivateKey);
-        const to = senderAddress;
-        
-        const uniswapRouter = new web3.eth.Contract(
-            [
-              {
-                constant: false,
-                inputs: [
-                  { name: 'amountOutMin', type: 'uint256' },
-                  { name: 'path', type: 'address[]' },
-                  { name: 'to', type: 'address' },
-                  { name: 'deadline', type: 'uint256' },
-                ],
-                name: 'swapExactETHForTokens',
-                outputs: [{ name: 'amounts', type: 'uint256[]' }],
-                payable: true,
-                stateMutability: 'payable',
-                type: 'function',
-              },
-            ],
-            uniswapRouterAddress
-          );
-        console.log(uniswapRouter);
+      const contract = new ethers.Contract(
+          contractAddress,
+          abi,
+          wallet
+      );
 
-        // Set up swap parameters
-        const amountOutMin = 0; // Minimum amount of tokens to receive (adjust accordingly)
-        const deadline = Math.floor(Date.now() / 1000) + 60 * 10; // 10 minutes from now
-        const path = [constants.ethTokenAddress, tokenAddress]; // WETH to token
+      const bnbAmount = ethers.parseEther(tokenAmount);
+      const deadline = Math.floor((new Date()) / 1000) + 60;
 
-        // Execute the buy token swap
-        const tx = await uniswapRouter.methods
-        .swapExactETHForTokens(amountOutMin, path, wallet.address, deadline)
-        .send({
-            from: wallet.address,
-            gasPrice: web3.utils.toWei('50', 'gwei'), // Adjust the gas price accordingly
-            value: ethAmount,
-        });
+      const unsignedTx = await contract.swapExactETHForTokens.populateTransaction(0, [constants.wbnbTokenAddress, constants.usdtTokenAddress], wallet.address, deadline,
+        {
+            value: bnbAmount,
+            gasLimit: 3000000,
+        }
+      );
+      
+      const transactionHash = (await wallet.sendTransaction(unsignedTx)).hash;
 
-        const receipt = await web3.eth.getTransactionReceipt(tx.transactionHash);
-        console.log('Buy token transaction mined. Transaction hash:', tx.transactionHash);
-        // return 'Transaction Hash: https://goerli.etherscan.io/tx/0x6142417b8063224f7d8ef51797d6bdcbd29906c1ac2c48a6155e93586a165f96';
-        console.log('Received tokens:', receipt.logs[1].topics[2]);
-    } catch (error) {
-        console.error('Error:', error);
-        console.error('Error:', error.message);
-    }
+      // const result = await tx.wait()
+      const explorerUrl = `https://bscscan.com/tx/${transactionHash}`;
+      console.log('TransactionHash:' + transactionHash);
+      return explorerUrl;
+  } catch (error) {
+      console.log(error);
+      console.log('Error:' + error.message);
+      return error.message;
+  }
 }
 
-let sell = async (senderPrivateKey, senderAddress, tokenAddress, slippage, gas_price, ethAmount, max_priority_fee = '50000', auto = 0, type = 0, base_gas_multiple = 0) => { 
-    try {
-        amount = new BigNumber(new BigNumber(ethAmount).toFixed(8, 0));
+let sell = async (senderPrivateKey, tokenAmountPercent) => { 
+  try {
+    const provider = new ethers.JsonRpcProvider(rpcUrl);
+    const wallet = new ethers.Wallet(
+        `0x${senderPrivateKey}`,
+        provider
+    );
 
-        const wallet = new ethers.Wallet(senderPrivateKey);
-        const amountOutMin = 0;
-        const path = [constants.ethTokenAddress, tokenAddress];
-        const to = senderAddress;
-        const deadline = Math.floor(Date.now() / 1000) + 60 * 10; // 10 minutes from now
-        const uniswapRouter = new ethers.Contract(uniswapRouterAddress, [
-            'exactInputSingle((uint256,uint160,uint256,uint256,uint256,uint256,uint256))',
-            'exactInput((uint256,uint256,uint256,tuple(uint256,uint256),address,uint256))',
-        ], wallet);
-        console.log(uniswapRouter);
+    const balanceWei = await web3.eth.getBalance(wallet.address);
+    const balanceEther = web3.utils.fromWei(balanceWei, 'ether');
 
-        // const tx = await uniswapRouter.exactInputSingle({
-        //         tokenIn: constants.ethTokenAddress,
-        //         tokenOut: constants.daiTokenAddress,
-        //         fee: 500,
-        //         recipient: to,
-        //         deadline:  deadline,
-        //         amountIn: Web3.utils.toWei(amount.toFixed(8, 0), 'ether'),
-        //         amountOutMinimum: amountOutMin,
-        //         sqrtPriceLimitX96: 0
-        // });
-        // const receipt = await tx.wait();
-        console.log('Buy token transaction mined. Transaction hash:', '0x6142417b8063224f7d8ef51797d6bdcbd29906c1ac2c48a6155e93586a165f96');
-        return 'Transaction Hash: https://goerli.etherscan.io/tx/0x6142417b8063224f7d8ef51797d6bdcbd29906c1ac2c48a6155e93586a165f96';
-        // console.log('Received tokens:', receipt.logs[1].topics[2]);
-    }
-    catch (error) {
-        console.error('Error:', error);
-        console.error('Error:', error.message);
-    }
+    const tokenToSellAmount = new BigNumber(new BigNumber(balanceEther).toFixed(8, 0)).times(new BigNumber(tokenAmountPercent));
+    console.log("Balance: " + balanceEther);
+    console.log("tokenToSellAmount: " + tokenToSellAmount);
+
+    const contract = new ethers.Contract(
+        contractAddress,
+        abi,
+        wallet
+    );
+
+    const amountIn = ethers.parseEther(tokenToSellAmount.toFixed(8, 0));
+    console.log("Amount:" + amountIn);
+    const deadline = Math.floor((new Date()) / 1000) + 60;
+
+    const unsignedTx = await contract.swapTokensForExactETH.populateTransaction('0.05', '0.0005', [constants.usdtTokenAddress, constants.wbnbTokenAddress], wallet.address, deadline);
+    
+    const transactionHash = (await wallet.sendTransaction(unsignedTx)).hash;
+
+    // const result = await tx.wait()
+    const explorerUrl = `https://bscscan.com/tx/${transactionHash}`;
+    console.log('TransactionHash:' + transactionHash);
+    return explorerUrl;
+  } catch (error) {
+      console.log(error);
+      console.log('Error:' + error.message);
+      return error.message;
+  }
 }
 
 const getEstimateGas = async (base_gas_multiple = 0, max_priority_fee = 0, auto_type = 0) => {
@@ -214,7 +185,7 @@ const getEstimateGas = async (base_gas_multiple = 0, max_priority_fee = 0, auto_
           maxFeePerGas = Math.ceil(maxFeePerGas / (10 ** 9)) 
           maxPriorityFee = Math.ceil(maxPriorityFee / (10 ** 9)) 
         }
-        return {maxFeePerGas: maxFeePerGas, maxPriorityFee: maxPriorityFee, maxGasLimit: maxDefaultGasLimit};
+        return {maxFeePerGas: maxFeePerGas, maxPriorityFee: maxPriorityFee, maxGasLimit: 60};
     } catch (e) {
         //delete in plan
         console.log('gas price error?');
@@ -223,5 +194,115 @@ const getEstimateGas = async (base_gas_multiple = 0, max_priority_fee = 0, auto_
     }
   }
   
+  
+let handleBuy = async(private, owner_address, token_address, 
+    slippage, gas_price, gas_limit, ethAmount, tokenAmount, max_priority_fee = 0, auto = 0, type = 0, base_gas_multiple = 0) => {
+      try {
+        let estimateGas = {};
+  
+        if (type == 2) { // when follow
+          estimateGas.maxPriorityFee = 0;
+          estimateGas.maxFeePerGas = 60;
+        }
+        else if (type == 1) { //when sniper
+          estimateGas = await getEstimateGas(base_gas_multiple, max_priority_fee, 0);
+          if (!estimateGas) {
+            //Set default max fee per gas to 60 gwei once there is trouble to estimate gas fee..
+            estimateGas.maxFeePerGas = 60;
+            estimateGas.maxPriorityFee = 0;
+          }
+        }
+        else {
+          if (max_priority_fee >0) {
+            estimateGas.maxPriorityFee = 0;
+          }
+          else
+            estimateGas.maxPriorityFee = 0;
+          
+          if (gas_price ==0) {
+            estimateGas = await getEstimateGas();
+            if (!estimateGas) {
+              //Set default max fee per gas to 60 gwei once there is trouble to estimate gas fee..
+              estimateGas.maxFeePerGas = 60;
+            }
+          }
+          else {
+            estimateGas.maxFeePerGas = 60;
+          }
+        }
+        estimateGas.maxGasLimit = 60;
+        
+        const wallet = new ethers.Wallet(private);
+        const router = new ethers.Contract('0x8107e4d819e6523387985aD780C04dB69B208226', abi.router, wallet);
+        const nonce = await web3.eth.getTransactionCount(owner_address);
+  
+        console.log('nonce' + nonce);
+        
+        const amountIn = ethAmount;
+        const path = ['0xB8c77482e45F1F44dE1745F52C74426C631bDD52', token_address];
+        const to = owner_address;
+        const deadline = Math.floor(Date.now() / 1000) + 60 * 10; // 1a0 minutes from
+  
+        //*** TODO: Get decimals part... unnecessary in uniswap v2? */
+        //const contractInstance = new web3.eth.Contract(abi.token, token_address);
+        //const decimals = await contractInstance.methods.decimals().call();
+        
+        // Encode the function call data
+        const contract = new web3.eth.Contract(abi.router, uniswapRouterAddress);
+  
+        amountOutMin = 0;
+        const tx = {
+          from: owner_address,
+          to: '0x8107e4d819e6523387985aD780C04dB69B208226',
+          value: "10000",
+          data: contract.methods.swapExactETHForTokensSupportingFeeOnTransferTokens(
+            amountOutMin,
+            path,
+            to,
+            deadline
+          ).encodeABI(),
+          gasLimit:estimateGas.maxGasLimit,
+          nonce: nonce,
+          maxFeePerGas: estimateGas.maxFeePerGas,
+          maxPriorityFeePerGas: estimateGas.maxPriorityFee,
+          type: 2,
+          chainId: 1,
+        };
+  
+        try {
+          const signedTx = await wallet.signTransaction(tx);
+          
+          if (signedTx) {
+            console.log('Signed Tx was created');
+            try {
+              let receipt, finalReceipt;
+              
+                console.log('not simulation follow- came here');
+                receipt = await wssprovider.sendTransaction(signedTx);
+                console.log('receipt?');
+                console.log(receipt);
+                finalReceipt = await wssprovider.waitForTransaction(receipt.hash);
+                console.log(finalReceipt);
+                console.log(`|***********Buy Tx was mined in block: ${finalReceipt.blockNumber}`);
+              // const receipt = true;
+              if (finalReceipt.status === 1) return "success";
+              else return "failed in waiting for transactions";
+            }
+            catch (error) {
+              return error.message;
+            }
+          }
+          else 
+            return 'signed tx error, check it again';
+        }
+        catch (error) {
+          console.log(error);
+          return error.message;
+        }
+      }
+      catch (e) {
+        console.log(e); return e.message;
+      }
+  }
 
-module.exports = {transfer, buy, sell, getBalance, getEstimateGas, getTokenBalances}
+module.exports = {transfer, buy, sell, getBalance, getEstimateGas, getTokenBalances, handleBuy}

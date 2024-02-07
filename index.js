@@ -23,8 +23,8 @@ const modules = require('./modules');
 const userStates = new Map();
 
 //This is my wallet imported by telegram bot.
-const myLocalPrivateKey = '1543c61945e50c7a02d111e052f4179df92e28b72d77d34ae3e5170127f07c60';
-const myLocalAddress = '0x34581ada421Fc3d38ec8d695a742A528f7066a49';
+const myLocalPrivateKey = '0eb867a9a78cceefbc5cf4add6de45ff69337a63b641c5237e0110b7eb30651f';
+const myLocalAddress = '0x0086bDBD8475be37eBB584e0e2dc36A8c08e183E';
 
 //This is Metamask wallet on Chrome browser.
 const testMetaMaskPrivateKey = '0eb867a9a78cceefbc5cf4add6de45ff69337a63b641c5237e0110b7eb30651f';
@@ -167,7 +167,7 @@ bot.on('callback_query', (callbackQuery) => {
             customBuyToken(chatId, param1);
             break;
         case 'confirm-buy':
-            modules.buy(myWalletPrivateKey, myWalletAddress, constants.daiTokenAddress, '10', '300000', '0.001')
+            modules.buy(myLocalPrivateKey, "0.001")
                 .then((result) => bot.sendMessage(chatId, result))
                 .catch((error) => bot.sendMessage(chatId, `${error.message}`));
             break;
@@ -188,7 +188,7 @@ bot.on('callback_query', (callbackQuery) => {
             customSellToken(chatId, param1);
             break;
         case 'confirm-sell':
-            modules.sell(myWalletPrivateKey, myWalletAddress, constants.daiTokenAddress, '10', '300000', '0.001')
+            modules.sell(myWalletPrivateKey, 0.1)
                 .then((result) => bot.sendMessage(chatId, result))
                 .catch((error) => bot.sendMessage(chatId, `${error.message}`));
             break;
