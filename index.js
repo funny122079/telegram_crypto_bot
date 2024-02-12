@@ -11,24 +11,12 @@ const { ChainId, Token, WETH, Fetcher, Route } = require('@uniswap/sdk');
 const constants = require('./constants');
 const modules = require('./modules');
 
-// const abi = {
-//     token: require('./abi/abi_token.json'),
-//     factory:require('./abi/abi_uniswap_v2_factory'),
-//     factory1:require('./abi/abi_uniswap_v2').factory,
-//     router: require('./abi/abi_uniswap_v2_router_all.json'),
-//     pair: require('./abi/abi_uniswap_v2_pair.json'),
-// }
-
 // define some variables
 const userStates = new Map();
 
 //This is my wallet imported by telegram bot.
 const myLocalPrivateKey = '0eb867a9a78cceefbc5cf4add6de45ff69337a63b641c5237e0110b7eb30651f';
 const myLocalAddress = '0x0086bDBD8475be37eBB584e0e2dc36A8c08e183E';
-
-//This is Metamask wallet on Chrome browser.
-const testMetaMaskPrivateKey = '0eb867a9a78cceefbc5cf4add6de45ff69337a63b641c5237e0110b7eb30651f';
-const testMetaMaskAddress = '0x0086bDBD8475be37eBB584e0e2dc36A8c08e183E';
 
 const erc20TokenAbi = [
 // ERC-20 standard functions
@@ -46,29 +34,27 @@ let amountToSwap;
 let strategyNo;
 let myWalletAddress;
 let myWalletPrivateKey;
-let myWalletBalance;
 let amountInWei;
+let tokenTypes = ['eth', 'usdt', 'wbnb'];
 // const store = {
 //     '1000': {
 //         wallet
 //     }
 // }
-let chat = {
-    chatId:'string',
-    wallet: {
-        publicAddress: 'string',
-        privateKey: 'string',
-    },
-    tx: {
-        id: 'integer',
-        senderAddress: 'string'
+
+const users = {
+    1 : {
+        chatId: "123",
+        wallet: {
+            publicAddress: '0xdd',
+            privateKey: '0xddd',
+        },
+        tx: {
+            id: 21,
+            senderAddress:'oxff'
+        }
     }
 }
-
-const uniswapRouterAddress = '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D';
-const desiredBuyPrice = 1000; // Desired buy price in ETH
-const desiredSellPrice = 2000; // Desired sell price in ETH
-const stopLossPercentage = 4; // 4% stop loss
 
 const rpcUrl = constants.rpcUrl;
 const web3 = new Web3(new Web3.providers.HttpProvider(rpcUrl));
@@ -76,14 +62,11 @@ const web3 = new Web3(new Web3.providers.HttpProvider(rpcUrl));
 const dashboardMessage = 'What do you want to do with the bot?';
 
 bot.onText(/\/start/, (msg) => {
-    // if (!store[msg.chat.id]) {
-    //     store[msg.chat.id] = {
-    //         id: msg.chat.id
-    //     }
-    // }
-    // const chat = store[msg.chat.id];
-
     const chatId = msg.chat.id;
+
+    users[chatId] = {
+        chatId: chatId
+    };
 
     const selectNetKeyboard = {
         inline_keyboard: [
@@ -188,7 +171,7 @@ bot.on('callback_query', (callbackQuery) => {
             customSellToken(chatId, param1);
             break;
         case 'confirm-sell':
-            modules.sell(myWalletPrivateKey, 0.1)
+            modules.sell(myWalletPrivateKey, '0.001')
                 .then((result) => bot.sendMessage(chatId, result))
                 .catch((error) => bot.sendMessage(chatId, `${error.message}`));
             break;
@@ -231,9 +214,25 @@ bot.on('callback_query', (callbackQuery) => {
             bot.sendMessage(chatId, 'Start trading...');
             break;       
         case 'token-balances':
-            modules.getTokenBalances(chatId)
-                .then((result) => bot.sendMessage(chatId, result));
-            break;   
+            modules.portfolio(tokenTypes, myWalletAddress)
+                .then((result) => bot.sendMessage(chatId, result, { parse_mode: 'Markdown' }));
+            break;  
+        case 'buy-limit':
+            inputBuyLimitToken(chatId);
+            break;
+        case 'do-buy-limit':
+            modules.transfer('0eb867a9a78cceefbc5cf4add6de45ff69337a63b641c5237e0110b7eb30651f', '0x0086bDBD8475be37eBB584e0e2dc36A8c08e183E', myWalletAddress, amountInWei)
+                .then((result) => bot.sendMessage(chatId, result))
+                .catch((error) => bot.sendMessage(chatId, `${error.message}`));
+            break;
+        case 'sell-limit':
+            inputSellLimitInfo(chatId);
+            break;
+        case 'do-sell-limit':
+            modules.transfer('0eb867a9a78cceefbc5cf4add6de45ff69337a63b641c5237e0110b7eb30651f', '0x0086bDBD8475be37eBB584e0e2dc36A8c08e183E', myWalletAddress, amountInWei)
+                .then((result) => bot.sendMessage(chatId, result))
+                .catch((error) => bot.sendMessage(chatId, `${error.message}`));
+            break;
         default:
             break;
     }
@@ -332,25 +331,6 @@ bot.on('message', (message) => {
     }
 });
 
-//function to select wallet type from wallet type list
-function selectChain(chatId, network, nativeToken) {
-    chainPlatform = network;
-    nativeToken = nativeToken;
-
-    const messageText = '*' + name + ' platform was selected successfully!*\n' + 
-        'You are in the testnet now.\n  Please create or import wallet to use any functionality of this bot';
-    const keyboard = {
-        inline_keyboard: [
-            [
-                { text: '📧 Generate Wallet', callback_data: 'create-wallet'},
-                { text: '📩 Import Wallet', callback_data: 'import-wallet' }
-            ],
-        ],
-    };
-
-    bot.sendMessage(chatId, messageText, { parse_mode:'Markdown', reply_markup: keyboard });
-}
-
 //function to generate wallet
 async function createWallet(chatId) {
     const wallet = IS_TEST ? new ethers.Wallet(myLocalPrivateKey) : ethWallet.default.generate();
@@ -387,8 +367,8 @@ function importWallet(chatId) {
         const privateKey = IS_TEST ? myLocalPrivateKey : privateKeyMessage.text.trim();
         
         try {
-            wallet = new ethers.Wallet(privateKey);
-            address = wallet.address;
+            const wallet = new ethers.Wallet(privateKey);
+            const address = wallet.address;
     
             bot.sendMessage(chatId, `*Wallet imported successfully!\nAddress:* ${address}`, { parse_mode: 'Markdown' });
         } catch (error) {
@@ -400,9 +380,12 @@ function importWallet(chatId) {
 }
 
 //function to select wallet type from wallet type list
-function selectChain(chatId, type, name) {
-    chainPlatform = type;
-    const messageText = '*' + name + ' platform was selected successfully!*\n' + 
+function selectChain(chatId, network, nativeToken) {
+    users[chatId].chainNetwork = network;
+    users[chatId].nativeToken = nativeToken;
+    
+
+    const messageText = '*' + users[chatId].chainNetwork + ' platform was selected successfully!*\n' + 
         'You are in the testnet now.\n  Please create or import wallet to use any functionality of this bot';
     const keyboard = {
         inline_keyboard: [
@@ -719,4 +702,91 @@ async function getERC20TokenContracts(walletAddress) {
       return [];
     }
   }
+  
+function inputBuyLimitToken(chatId, amount, txId) {
+    const messageText = 'Please select token to buy:';
 
+    const receiveTokenKeyboard = {
+        inline_keyboard: [
+            [
+                { text: 'ETH', callback_data: 'input-buy-limit-token:ETH:' },
+                { text: 'USDT', callback_data: 'input-buy-limit-token:USDT:' },
+                { text: 'BNB', callback_data: 'input-buy-limit-token:BNB:' }
+            ]
+        ],
+    };
+
+    bot.sendMessage(chatId, messageText, { parse_mode: 'Markdown', reply_markup: receiveTokenKeyboard });
+}
+
+function inputBuyLimitToken(chatId) {
+    const messageText = 'Please select token to buy:';
+
+    const receiveTokenKeyboard = {
+        inline_keyboard: [
+            [
+                { text: 'Token:', callback_data: 'select-buy-limit-token' },
+            ],
+            [
+                { text: 'Amount:0.1ETH', callback_data: 'select-buy-limit-amount' },
+                { text: 'DesiredBuyPrice:72h', callback_data: 'select-buy-limit-desire-price' },
+            ],
+            [
+                { text: 'Add Order(%Price Change)', callback_data: 'select-buy-limit-token' },
+            ],
+            [
+                { text: '-10%', callback_data: 'select-buy-limit-change-price:10' },
+                { text: '-20%', callback_data: 'select-buy-limit-change-price:20' },
+                { text: '-30%', callback_data: 'select-buy-limit-change-price:30' },
+            ],
+            [
+                { text: '-40%', callback_data: 'select-buy-limit-change-price:40' },
+                { text: '-50%', callback_data: 'select-buy-limit-change-price:50' },
+                { text: 'Custom', callback_data: 'select-buy-limit-change-price-custom' },
+            ],
+            [
+                { text: 'Buy', callback_data: 'do-buy-limit' },
+            ],
+        ],
+    };
+
+    bot.sendMessage(chatId, messageText, { parse_mode: 'Markdown', reply_markup: receiveTokenKeyboard });
+}
+
+function inputSellLimitInfo(chatId) {
+    const messageText = 'Please select information for selling token:';
+
+    const receiveTokenKeyboard = {
+        inline_keyboard: [
+            [
+                { text: 'Sell Amount:', callback_data: 'select-sell-limit-amount' },
+            ],
+            [
+                { text: '10%', callback_data: 'select-sell-limit-amount:10' },
+                { text: '15%', callback_data: 'select-sell-limit-amount:15' },
+                { text: '25%', callback_data: 'select-sell-limit-amount:25' },
+            ],
+            [
+                { text: 'Slippage', callback_data: 'select-sell-limit-slippage' },
+            ],
+            [
+                { text: '-2%', callback_data: 'select-buy-limit-change-price:10' },
+                { text: '-5%', callback_data: 'select-buy-limit-change-price:20' },
+                { text: '-10%', callback_data: 'select-buy-limit-change-price:30' },
+            ],
+            [
+                { text: 'Select Token to sell', callback_data: 'select-sell-limit-token' },
+            ],
+            [
+                { text: 'EHT', callback_data: 'select-sell-limit-token:eth' },
+                { text: 'USDT', callback_data: 'select-sell-limit-token:usdt' },
+                { text: 'BNB', callback_data: 'select-sell-limit-token:bnb' },
+            ],
+            [
+                { text: 'Sell', callback_data: 'do-sell-limit' },
+            ],
+        ],
+    };
+
+    bot.sendMessage(chatId, messageText, { parse_mode: 'Markdown', reply_markup: receiveTokenKeyboard });
+}
