@@ -4,19 +4,18 @@ const Moralis = require('moralis');
 const BigNumber = require("bignumber.js");
 const constants = require('./constants');
 const abi = require("./abi.json");
+const axios = require('axios');
 
 const rpcUrl = constants.rpcUrl;
 const web3 = new Web3(new Web3.providers.HttpProvider(rpcUrl));
-const contractAddress = constants.contractAddress;
+const contractAddress = constants.contractAddress.pancakeSwap;
 
 // get Native Token Balance of current chain network.
 let getBalance = async (address) => { 
     try {
         const balanceWei = await web3.eth.getBalance(address);
-        console.log(balanceWei);
 
         const balanceEther = web3.utils.fromWei(balanceWei, 'ether');
-        console.warn(balanceEther)
         return balanceEther;
     } catch (error) {      
         console.log(error.message);
@@ -44,21 +43,36 @@ let getTokenBalance = async(tokenContractAddress, walletAddress) => {
 }
 
 // get balance of certain token balance of current chain network.
-let portfolio = async (tokenTypes, walletAddress) => {
-    console.log("Wallet address:" + walletAddress);
-    console.log(constants.tokenAddress.usdt);
-    
-    let result = 'My wallet:\n' + 
-        '*Address: *' + walletAddress + '\n' +
-        '*USDT : *' + 0.79082 + 'USDT\n' +
-        '*BNB : *' + 0.0236 + 'BNB';
-    // tokenTypes.map((token) => {
-    //     console.log(constants.tokenAddress.$token);
-    //     balance = getTokenBalance(constants.tokenAddress.{token], walletAddress);
-    //     console.log(balance);
-    //     result = '*' + token + ':* '+ balance + '\n';
-    // });
-    return result;
+let portfolio = async (wallet) => {
+    console.log(wallet.publicAddress);
+    const tokensInWallet = await axios.get(
+        "https://deep-index.moralis.io/api/v2/" +
+        wallet.publicAddress +
+        "/erc20?chain=bsc",
+        {
+            headers: {
+                "X-API-Key":
+                    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub25jZSI6IjMzMWU1NmVhLThjM2YtNDJlMy04Mzc5LWQ0NDA3ZWFiZDgwNSIsIm9yZ0lkIjoiMzc2MDQ2IiwidXNlcklkIjoiMzg2NDQwIiwidHlwZSI6IlBST0pFQ1QiLCJ0eXBlSWQiOiJlOTM1MGM0NS0yZmMxLTQ2MWQtYTMyYi1kMGFmNWUxMWUzNGUiLCJpYXQiOjE3MDc4MzI4NTYsImV4cCI6NDg2MzU5Mjg1Nn0.YsJtNvvr1zaIxdNwuAV4r2R3WuGKO4ab6B5X2illCSM",
+            },
+        }
+    );
+    const userWalletTokenList = tokensInWallet.data;
+    console.log("user wallet token list: ", userWalletTokenList);
+
+    if(userWalletTokenList.length) {
+        userWalletTokenList.map((token, index) => {
+            const balanceInWei = ethers.BigNumber.from(token.balance);
+            const decimals = token.decimals;
+
+            const tokenBalance = balanceInWei.div((ethers.BigNumber.from(10)).pow(decimals));
+            wallet.tokenList[index] = {
+                symbol: token.symbol,
+                balance: tokenBalance  
+            }
+        })
+        console.log("Tokens of my wallet: ", wallet.tokenList);
+    }
+    return userWalletTokenList;
 }
 
 // send coin to external wallet
@@ -118,7 +132,6 @@ let sell = async (senderPrivateKey, tokenAmount) => {
       const bnbAmount = ethers.parseEther(tokenAmount);
       const deadline = Math.floor((new Date()) / 1000) + 60;
 
-      console.log(bnbAmount);
       const unsignedTx = await contract.swapExactETHForTokens.populateTransaction(0, [constants.tokenAddress.wbnb, constants.tokenAddress.usdt], wallet.address, deadline,
         {
             value: bnbAmount,
@@ -154,7 +167,7 @@ let buy = async (privateKey, tokenToBuyAmount) => {
         wallet
     );
 
-    const amountIn = ethers.parseEther(tokenAmount);
+    const amountIn = ethers.parseEther('0.0001');
     console.log("Amount:" + amountIn);
     const deadline = Math.floor((new Date()) / 1000) + 60;
 
