@@ -44,13 +44,12 @@ let getTokenBalance = async(tokenContractAddress, user) => {
     }
 }
 
-// get balance of certain token balance of current chain network.
+// get all token balances of current chain network at onece.
 let portfolio = async (user) => {
-    console.log(user.wallet.publicAddress);
     const tokensInWallet = await axios.get(
         "https://deep-index.moralis.io/api/v2/" +
         user.wallet.publicAddress +
-        "/erc20?chain=" + user.nativeToken,
+        "/erc20?chain=bsc",
         {
             headers: {
                 "X-API-Key":
@@ -59,22 +58,25 @@ let portfolio = async (user) => {
         }
     );
     const tokenBalances = tokensInWallet.data;
-    console.log("user wallet token list: ", tokenBalances);
 
-    if(userWalletTokenList.length) {
-        userWalletTokenList.map((token, index) => {
-            const balanceInWei = ethers.BigNumber.from(token.balance);
-            const decimals = token.decimals;
-
-            const tokenBalance = balanceInWei.div((ethers.BigNumber.from(10)).pow(decimals));
-            wallet.tokenList[index] = {
-                symbol: token.symbol,
-                balance: tokenBalance  
+    const balanceResult = [];
+    if (tokenBalances) {
+        tokenBalances.map((item) => {
+            if (!item.verified_contract) {
+                return;
             }
+            const balanceInWei = ethers.getBigInt(item.balance);
+            const balanceInEther = ethers.formatUnits(balanceInWei, 'ether');
+
+            const tokenBalanceObject = {
+                name : item.name,
+                symbol : item.symbol,
+                balance : balanceInEther
+            }
+            balanceResult.push(tokenBalanceObject);
         })
-        console.log("Tokens of my wallet: ", wallet.tokenList);
     }
-    return userWalletTokenList;
+    return balanceResult;
 }
 
 // send coin to external wallet

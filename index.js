@@ -761,18 +761,21 @@ function tradingSetPeriod(chatId, oldMessageId, currentInlineKeyboard) {
     });
 }
 
-function portfolio(chatId) {
+async function portfolio(chatId) {
     const user = getUser(chatId);
 
-    const balances = modules.portfolio(user);
-    console.log(balances);
+    const tokenBalances = await modules.portfolio(user);
+    const walletBalance = await modules.getBalance(user.rpcUrl, user.wallet.publicAddress);
 
-    const message = "*=====  Your Wallet  ====*\n" +
+    let message = "*=====  Your Wallet Assets ====*\n" +
+        '*Chain Network:*' + user.chainNetwork + '\n' +
         '*Address:*' + user.wallet.publicAddress + ' \n' +
-        '*Balance:*\n' +
-        '*ETH:* 0.0148ETH\n' +
-        '*BNB:* 0.3BNB\n' +
-        '*USDT:* 225USDT\n';
+        '*Balance:*' + parseFloat(walletBalance).toFixed(4) + ' ' + user.nativeToken + '\n\n' +
+        '*Holding Token Balances:*\n';
+
+        tokenBalances.map((item) => {
+        message = message + '*-' + item.name + ' :* ' + parseFloat(item.balance).toFixed(2) + ' ' + item.symbol + '\n';
+    })
         
     bot.sendMessage(chatId, message, { parse_mode: 'Markdown' }); 
 }
