@@ -14,29 +14,49 @@ const messages = require('./consts/messageTexts');
 // define some variables
 const userStates = new Map();
 
-let senderPrivateKey, recipientAddress, amount;
-let nativeToken = 'ETH';
-let tokenToSellAddress; // e.g., ETH
-let tokenToBuyAddress; // e.g., DAI
-let amountToSwap;
-let strategyNo;
-let myWalletAddress;
-let amountInWei;
-
-const users = [];
+const users = [
+    {
+        chatId: '1',
+        env: 'mainnet',
+        chainNetwork: 'Ethereum',
+        nativeToken: 'ETH',
+        wallet: {
+            publicAddress: '0x00',
+            privateKey: '0f00'
+        },
+        tx: [
+            {
+                id: 1,
+                type: 'transfer',
+                recipient: '0f00',
+                amount: '0.003',
+                date: '01/12/2024',
+                status: 'success'
+            },
+            {
+                id: 1,
+                type: 'buy',
+                recipient: '0f00',
+                amount: '0.003',
+                date: '01/12/2024',
+                status: 'pending'
+            }
+        ]
+    }
+];
 
 bot.onText(/\/start/, (msg) => {
     const chatId = msg.chat.id;
 
     users.push({
         chatId: chatId,
-        env: 'Testnet'
+        env: 'mainnet'
     });
-    
-    const messageText2 = 'Select chain below to get started';
+
+    const messageText = 'Select chain below to get started';
 
     bot.sendMessage(chatId, messages.welcomeText, { parse_mode:'Markdown' });
-    bot.sendMessage(chatId, messageText2, { reply_markup: keyboards.selectNetKeyboard });
+    bot.sendMessage(chatId, messageText, { reply_markup: keyboards.selectNetKeyboard });
 });
 
 // Command handler for /wallet
@@ -264,22 +284,31 @@ function getUser(chatId) {
 }
 //function to generate wallet
 async function createWallet(chatId) {
-    const wallet = ethWallet.default.generate();
     const user = getUser(chatId);
+    if (typeof user.wallet !== 'undefined') {
+        bot.sendMessage(chatId, messages.warningWalletExisted, { parse_mode: 'Markdown' });
+        return;
+    }
+    const wallet = ethWallet.default.generate();
+    
     user.wallet = {
         publicAddress: wallet.getAddressString(),
         privateKey: wallet.getPrivateKeyString()
     }; 
-
-    const balance = await modules.getBalance(user.wallet.publicAddress);
             
-    const message = messages.walletGeneratedText(user.wallet.publicAddress, balance, user.nativeToken);
+    const message = messages.walletGeneratedText(user.wallet.publicAddress);
 
     bot.sendMessage(chatId, message, { parse_mode: 'Markdown', reply_markup: keyboards.mainMenuKeyboard });
 }
 
 //function to import wallet
 function importWallet(chatId) {
+    const user = getUser(chatId);
+    if (typeof user.wallet !== 'undefined') {
+        bot.sendMessage(chatId, messages.warningWalletExisted, { parse_mode: 'Markdown' });
+        return;
+    }
+
     bot.sendMessage(chatId, messages.inputPVTText);
 
     bot.once('message', async (privateKeyMessage) => {
@@ -292,8 +321,8 @@ function importWallet(chatId) {
                 privateKey: privateKey
             }; 
 
-            const balance = await modules.getBalance(user.wallet.publicAddress);
-            
+            const balance = await modules.getBalance(user.rpcUrl, user.wallet.publicAddress);
+
             const message = messages.walletImportedText(user.wallet.publicAddress, balance, user.nativeToken);
     
             bot.sendMessage(chatId, message, { parse_mode: 'Markdown', reply_markup: keyboards.mainMenuKeyboard });
@@ -308,10 +337,18 @@ function importWallet(chatId) {
 //function to select wallet type from wallet type list
 function selectChain(chatId, network, nativeToken) {
     const user = getUser(chatId);
+    if (network != 'Ethereum') {
+        bot.sendMessage(chatId, messages.warningAdditionalPay, { parse_mode: 'Markdown' });
+        return;
+    }
     user.chainNetwork = network;
-    user.nativeToken = nativeToken;
+    user.nativeToken = nativeToken
+    user.env = 'mainnet';
+    user.rpcUrl = constants.rpcUrls[user.env][user.chainNetwork];
 
-    const message = messages.chainNetSelectedText(user.chainNetwork);
+    console.log('RpcUrl : ' + user.rpcUrl);
+
+    const message = messages.chainNetSelectedText(user.chainNetwork, user.env);
     
     bot.sendMessage(chatId, message, { parse_mode:'Markdown', reply_markup: keyboards.createOrImportKeyboard });
 }
@@ -726,6 +763,10 @@ function tradingSetPeriod(chatId, oldMessageId, currentInlineKeyboard) {
 
 function portfolio(chatId) {
     const user = getUser(chatId);
+
+    const balances = modules.portfolio(user);
+    console.log(balances);
+
     const message = "*=====  Your Wallet  ====*\n" +
         '*Address:*' + user.wallet.publicAddress + ' \n' +
         '*Balance:*\n' +

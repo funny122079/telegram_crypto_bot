@@ -3,17 +3,20 @@ const {ethers} = require('ethers');
 const Moralis = require('moralis');
 const BigNumber = require("bignumber.js");
 const constants = require('./constants');
-const abi = require("./abi.json");
 const axios = require('axios');
+const abi = {
+    token: require('./abi/abi_token.json'),
+    pancake: require('./abi/abi.json'),
+  }
 
-const rpcUrl = constants.rpcUrl;
-const web3 = new Web3(new Web3.providers.HttpProvider(rpcUrl));
 const contractAddress = constants.contractAddress.pancakeSwap;
 
 // get Native Token Balance of current chain network.
-let getBalance = async (address) => { 
+let getBalance = async (rpcUrl, address) => { 
     try {
+        const web3 = new Web3(new Web3.providers.HttpProvider(rpcUrl));
         const balanceWei = await web3.eth.getBalance(address);
+        console.log(balanceWei);
 
         const balanceEther = web3.utils.fromWei(balanceWei, 'ether');
         return balanceEther;
@@ -24,16 +27,15 @@ let getBalance = async (address) => {
 }
 
 // get balance of certain token balance of current chain network.
-let getTokenBalance = async(tokenContractAddress, walletAddress) => {
-    const provider = new ethers.JsonRpcProvider(rpcUrl);
+let getTokenBalance = async(tokenContractAddress, user) => {
+    const provider = new ethers.JsonRpcProvider(user.rpcUrl);
     // Define ERC20 contract interface and address
     const erc20Interface = new ethers.Interface(['function balanceOf(address) external view returns (uint256)']);
   
     // Create contract instance
     const tokenContract = new ethers.Contract(tokenContractAddress, erc20Interface, provider);
-  
     try {
-        const balance = await tokenContract.balanceOf(walletAddress);
+        const balance = await tokenContract.balanceOf(user.wallet.publicAddress);
         console.log('Token Balance:', balance.toString());
         return balance;
     } catch (error) {
@@ -43,12 +45,12 @@ let getTokenBalance = async(tokenContractAddress, walletAddress) => {
 }
 
 // get balance of certain token balance of current chain network.
-let portfolio = async (wallet) => {
-    console.log(wallet.publicAddress);
+let portfolio = async (user) => {
+    console.log(user.wallet.publicAddress);
     const tokensInWallet = await axios.get(
         "https://deep-index.moralis.io/api/v2/" +
-        wallet.publicAddress +
-        "/erc20?chain=bsc",
+        user.wallet.publicAddress +
+        "/erc20?chain=" + user.nativeToken,
         {
             headers: {
                 "X-API-Key":
@@ -56,8 +58,8 @@ let portfolio = async (wallet) => {
             },
         }
     );
-    const userWalletTokenList = tokensInWallet.data;
-    console.log("user wallet token list: ", userWalletTokenList);
+    const tokenBalances = tokensInWallet.data;
+    console.log("user wallet token list: ", tokenBalances);
 
     if(userWalletTokenList.length) {
         userWalletTokenList.map((token, index) => {
