@@ -1,6 +1,6 @@
 const mainMenuKeyboard = {
     inline_keyboard: [
-        [{ text: '↔ Transfer', callback_data: 'transfer'}, { text: '💱 Token Balances', callback_data: 'token-balances'}], 
+        [{ text: '↔ Send Coin', callback_data: 'transfer'}, { text: '💱 Token Balances', callback_data: 'token-balances'}], 
         [{ text: '🟢 Buy Tokens', callback_data: 'buy'}, { text: '🔴 Sell Tokens', callback_data: 'sell'}], 
         [{ text: '⬆ Buy Limit', callback_data: 'buy-limit'}, { text: '⬇ Sell Limit', callback_data: 'sell-limit'}], 
         [{ text: '📈 Trading', callback_data: 'trading'}, { text: '📊 PnL Analysis', callback_data: 'pnl-analysis'}],
@@ -29,7 +29,7 @@ const confirmTransferKeyboard = {
 const setTokenToSellKeyboard = {
     inline_keyboard: [
         [
-            { text: 'DAI', callback_data: 'token-to-buy:DAI' },
+            { text: 'DAI', callback_data: 'token-to-buy:DAI' }, 
             { text: 'ETH', callback_data: 'token-to-buy:ETH' },
             { text: 'USDT', callback_data: 'token-to-buy:USDT' }
         ],

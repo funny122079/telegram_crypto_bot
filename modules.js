@@ -5,9 +5,9 @@ const BigNumber = require("bignumber.js");
 const constants = require('./constants');
 const axios = require('axios');
 const abi = {
-    token: require('./abi/abi_token.json'),
+    token: require('./abi/abi_token.json'), 
     pancake: require('./abi/abi.json'),
-  }
+}
 
 const contractAddress = constants.contractAddress.pancakeSwap;
 
@@ -16,7 +16,6 @@ let getBalance = async (rpcUrl, address) => {
     try {
         const web3 = new Web3(new Web3.providers.HttpProvider(rpcUrl));
         const balanceWei = await web3.eth.getBalance(address);
-        console.log(balanceWei);
 
         const balanceEther = web3.utils.fromWei(balanceWei, 'ether');
         return balanceEther;
@@ -80,35 +79,63 @@ let portfolio = async (user) => {
 }
 
 // send coin to external wallet
-let transfer = async (senderPrivateKey, senderAddress, recipientAddress, amountInWei) => { 
+let transfer = async (user) => { 
     try {
-        // const amount = amountMessage.text.trim();
-        const nonce = await web3.eth.getTransactionCount(senderAddress);
+        const web3 = new Web3(new Web3.providers.HttpProvider(user.rpcUrl));
+        const nonce = await web3.eth.getTransactionCount(user.wallet.publicAddress);
         
         const gasPrice = await web3.eth.getGasPrice();
         console.warn(gasPrice);
         
         const transaction = {
-            from: senderAddress,   
-            to: recipientAddress,
-            value: amountInWei,
-            //gasPrice: "4100000000",
+            from: user.wallet.publicAddress,   
+            to: user.tx.recipientAddress,
+            value: user.tx.amountInWei,
             gasPrice: gasPrice,
             gasLimit: "30000", // Gas limit for a standard ETH transfer
             nonce: nonce
         };
         // Sign the transaction
-        const signedTransaction = await web3.eth.accounts.signTransaction(transaction, senderPrivateKey);
+        const signedTransaction = await web3.eth.accounts.signTransaction(transaction, user.wallet.privateKey);
         const transactionReceipt = await web3.eth.sendSignedTransaction(signedTransaction.rawTransaction);
-        console.log(transactionReceipt);
-        const explorerUrl = `Transaction Hash: https://bscscan.com/tx/${transactionReceipt.transactionHash}`;
-        console.log(explorerUrl);
+        const explorerUrl = `Transaction Hash: ` + constants.explorerUrls[user.chainNetwork]+ `tx/${transactionReceipt.transactionHash}`;
         console.warn("Sent!!!!");
         return explorerUrl;
     } catch(error) {
         console.error('Error:', error);
         return 'Error:' + error.message;
     }
+}
+
+//send token holding in wallet to external wallet
+let tokenTransfer = async (user) => {
+    try {
+      const provider = new ethers.JsonRpcProvider(user.rpcUrl);
+      const wallet = new ethers.Wallet(
+          `0x${user.wallet.privateKey}`,
+          provider
+      );
+
+      const contract = new ethers.Contract(
+          constants.tokenContractAddress[user.chainNetwork][user.tx.token],
+          abi.token,
+          wallet
+      );
+
+      console.log(user.tx.amountInWei)
+      const unsignedTx = await contract.transfer.populateTransaction(user.tx.recipientAddress, user.tx.amountInWei);
+      
+      const transactionHash = (await wallet.sendTransaction(unsignedTx)).hash;
+
+      // const result = await tx.wait()
+      const explorerUrl = `https://bscscan.com/tx/${transactionHash}`;
+      console.log('TransactionHash:' + transactionHash);
+      return explorerUrl;
+  } catch (error) {
+      console.log(error);
+      console.log('Error:' + error.message);
+      return error.message;
+  }
 }
 
 // Sell native token as much as certain percentage to other token.
@@ -192,4 +219,4 @@ let buy = async (privateKey, tokenToBuyAmount) => {
   }
 }
 
-module.exports = {transfer, buy, sell, getBalance, getTokenBalance, portfolio }
+module.exports = {transfer, tokenTransfer, buy, sell, getBalance, getTokenBalance, portfolio }

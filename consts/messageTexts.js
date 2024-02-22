@@ -9,7 +9,6 @@ const welcomeText = '*Welcome to CryptiboBot!*\n' +
 
 const inputPVTText = 'Please provide your Ethereum private key:';
 const inputTransferRecipientText= 'Please reply with the address to send:';
-const inputTransferAmountText= 'Please reply with the amount to send:';
 const selectTokenToSell = 'Please select the Token Name to sell :';
 
 const walletMainText = (address, balance, nativeToken) => {
@@ -77,6 +76,13 @@ const pnlAnalysisText = (net, amount, nativeToken) => {
 
     return message;
 }
+
+const inputTransferAmountText = (balance, nativeToken) => {
+    let message = 'Please reply with the amount to send:\n\n' +
+        '*MaxSendableAmount: *' + balance + ' ' + nativeToken;
+
+    return message;
+} 
 
 /////////////////////////////   Warning Messages  ////////////////////////////
 const warningAdditionalPay = '*~~~~~~~~  Warning!  ~~~~~~~~*\nYou must pay additional fee for using this.\n Please select other one.';

@@ -6,8 +6,10 @@ const bot = new telegramBot(TOKEN, {polling:true})
 const ethWallet = require('ethereumjs-wallet')
 const {ethers} = require('ethers');
 const {Web3} = require('web3');
+const EthereumAddress = require('ethereum-address');
 const constants = require('./constants');
 const modules = require('./modules');
+const main = require('./main');
 const keyboards = require('./consts/keyboards');
 const messages = require('./consts/messageTexts');
 
@@ -160,13 +162,16 @@ bot.on('callback_query', (callbackQuery) => {
             trading(chatId);
             break;
         case 'confirm-transfer':
-            modules.transfer(user.wallet.privateKey, user.wallet.publicAddress, user.tx.recipientAddress, user.tx.amountInWei)
+            modules.transfer(user)
                 .then((result) => bot.sendMessage(chatId, result))
                 .catch((error) => bot.sendMessage(chatId, `${error.message}`));
             break;
         case 'cancel-transfer':
-            deleteMessage(chatId, callbackQuery.message.message_id)
-                .then(() => console.log('Message deleted successfully!'));;
+            modules.tokenTransfer(user)
+                .then((result) => bot.sendMessage(chatId, result))
+                .catch((error) => bot.sendMessage(chatId, `${error.message}`))
+            // deleteMessage(chatId, callbackQuery.message.message_id)
+            //     .then(() => console.log('Message deleted successfully!'));;
             break;
         case 'token-to-sell':
             setTokenToSell(chatId, param1);
@@ -271,6 +276,29 @@ bot.on('message', (message) => {
     const currentState = userStates.get(chatId);
 
     switch (currentState) {
+        case 'validateRecipientAddress': 
+            if (!EthereumAddress.isAddress(message.text.trim())) {
+                bot.sendMessage(chatId, "Invalid recipient address. Please try to input again.");
+                userStates.set(chatId, 'reinputRecipientAddress');
+            } else {
+                setRecipientAddress(chatId, message.text.trim());
+                userStates.set(chatId, 'inputTransferAmount');
+            }
+            break;
+        case 'reinputRecipientAddress':
+            if (!EthereumAddress.isAddress(message.text.trim())) {
+                bot.sendMessage(chatId, "Invalid recipient address. Please try to input again.");
+            } else {
+                setRecipientAddress(chatId, message.text.trim());
+                userStates.set(chatId, 'inputTransferAmount');
+            }
+            break;
+        case 'inputTransferAmount':
+            validateTransferAmount(chatId, message.text.trim());
+            break;
+        case 'reinputTransferAmount':
+            validateTransferAmount(chatId, message.text.trim());
+            break;
         default:
             break;
     }
@@ -323,7 +351,7 @@ function importWallet(chatId) {
 
             const balance = await modules.getBalance(user.rpcUrl, user.wallet.publicAddress);
 
-            const message = messages.walletImportedText(user.wallet.publicAddress, balance, user.nativeToken);
+            const message = messages.walletImportedText(user.wallet.publicAddress, parseFloat(balance).toFixed(4), user.nativeToken);
     
             bot.sendMessage(chatId, message, { parse_mode: 'Markdown', reply_markup: keyboards.mainMenuKeyboard });
         } catch (error) {
@@ -356,31 +384,44 @@ function selectChain(chatId, network, nativeToken) {
 //send coin to external wallet.  required params - recipient Address, amount
 function transfer(chatId) {
     bot.sendMessage(chatId, messages.inputTransferRecipientText);
+    
+    userStates.set(chatId, 'validateRecipientAddress');
+}
+
+async function setRecipientAddress(chatId, address) {
     const user = getUser(chatId);
-    bot.once('message', (address) => {
-        if (user.tx) {
-            return;    
-        }
-        user.tx = {
-            type: 'transfer',
-            recipientAddress: address.text.trim()
-        };
+    if (user.tx) {
+        return;    
+    }
+    user.tx = {
+        type: 'transfer',
+        recipientAddress: address,
+        token: 'USDT'
+    };
+    const balance = await modules.getBalance(user.rpcUrl, user.wallet.publicAddress);
+    
+    const transferAmountText = messages.inputTransferAmountText(parseFloat(balance).toFixed(4), user.nativeToken);
+    bot.sendMessage(chatId, transferAmountText, { parse_mode: 'Markdown' });
+}
 
-        bot.sendMessage(chatId, messages.inputTransferAmountText);
+async function validateTransferAmount(chatId, amount) {
+    const user = getUser(chatId);
+    const balance = await modules.getBalance(user.rpcUrl, user.wallet.publicAddress);
 
-        bot.once('message', (amount) => {
-            user.tx.amount = new BigNumber(new BigNumber(amount.text).toFixed(8, 0));
-            if (!user.tx.amount.isNaN() && user.tx.amount.isGreaterThan(new BigNumber(0))) {
-                user.tx.amountInWei = Web3.utils.toWei(user.tx.amount.toFixed(8, 0), 'ether');
-                console.log(user.tx.amountInWei);
-
-                let message = messages.confirmTransferText(user.nativeToken, user.tx.amount, user.tx.recipientAddress);
-                bot.sendMessage(chatId, message, { parse_mode: 'Markdown', reply_markup: keyboards.confirmTransferKeyboard });
-            } else {
-                bot.sendMessage(chatId, 'Invalid amount! Please enter again.');
-            }
-        });
-    });
+    user.tx.amount = new BigNumber(new BigNumber(amount).toFixed(8, 0));
+    // if (!user.tx.amount.isNaN() && user.tx.amount.isGreaterThan(new BigNumber(balance))) {
+    //     userStates.set(chatId, 'reinputTransferAmount');
+    //     bot.sendMessage(chatId, 'Insufficient Balance! Amount must be less than ' + new BigNumber(balance).toFixed(4, 0) + user.nativeToken);
+    // } else if (!user.tx.amount.isNaN() && user.tx.amount.isGreaterThan(new BigNumber(0))) {
+        user.tx.amountInWei = Web3.utils.toWei(user.tx.amount.toFixed(8, 0), 'ether');
+        
+        userStates.set(chatId, 'initial');
+        let message = messages.confirmTransferText(user.nativeToken, user.tx.amount, user.tx.recipientAddress);
+        bot.sendMessage(chatId, message, { parse_mode: 'Markdown', reply_markup: keyboards.confirmTransferKeyboard });
+    // } else {
+    //     userStates.set(chatId, 'reinputTransferAmount');
+    //     bot.sendMessage(chatId, 'Invalid amount! Please enter again.');
+    // }
 }
 
 function setTokenToSell(chatId, tokenToSell) {

@@ -3,7 +3,7 @@ module.exports = {
     tokenContractAddress: {
         'Ethereum': {
             'WETH' : '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',  
-            'USDT' : '0xdAC17F958D2ee523a2206206994597C13D831ec7' 
+            'USDT' : '0x55d398326f99059fF775485246999027B3197955' 
         },
         'BSC': {
             'WBNB' : '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c',
@@ -22,7 +22,7 @@ module.exports = {
     }, 
     rpcUrls: {
         'mainnet': {
-            'Ethereum': 'https://mainnet.infura.io/v3/276601773a5841a29cd363a970f5a293',
+            'Ethereum': 'https://bsc-dataseed.binance.org/',
             'Polygon': 'https://polygon-pokt.nodies.app',                         //https://polygon-mainnet.infura.io/v3/276601773a5841a29cd363a970f5a293
             'Arbitrum': 'https://api.zan.top/node/v1/arb/one/public',             //https://arbitrum-mainnet.infura.io/v3/276601773a5841a29cd363a970f5a293
             'BSC': 'https://bsc-dataseed.binance.org/', 
@@ -34,6 +34,12 @@ module.exports = {
             'Arbitrum Goerli': 'https://arbitrum-goerli.publicnode.com',         //https://arbitrum-goerli.infura.io/v3/276601773a5841a29cd363a970f5a293
             'BSC Testnet': 'https://bsc-testnet.publicnode.com'
         }
+    },
+    explorerUrls: {
+        'Ethereum': 'https://etherscan.io/',
+        'Polygon': 'https://polygonscan.com/',
+        'Arbitrum': 'https://arbiscan.io/',
+        'BSC': 'https://bscscan.com/'
     }
 };
 

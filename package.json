@@ -14,10 +14,11 @@
     "@uniswap/sdk": "^3.0.3",
     "bignumber.js": "^9.1.2",
     "dotenv": "^16.4.0",
+    "ethereum-address": "^0.0.4",
     "ethereumjs-wallet": "^1.0.2",
+    "ethers": "^6.10.0",
     "moralis": "^2.24.2",
     "node-telegram-bot-api": "^0.64.0",
-    "web3": "^4.4.0",
-    "ethers": "^6.10.0"
+    "web3": "^4.4.0"                                                                                           
   }
 }
