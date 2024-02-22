@@ -3,13 +3,15 @@ module.exports = {
     tokenContractAddress: {
         'Ethereum': {
             'WETH' : '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',  
-            'USDT' : '0x55d398326f99059fF775485246999027B3197955' 
+            'USDT' : '0xdAC17F958D2ee523a2206206994597C13D831ec7',
+            'USDC' : '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' 
         },
         'BSC': {
             'WBNB' : '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c',
             'ETH' : '0x2170Ed0880ac9A755fd29B2688956BD959F933F8',
             'DAI' : '0x6B175474E89094C44Da98b954EedeAC495271d0F',
             'USDT' : '0x55d398326f99059fF775485246999027B3197955',
+            'USDC' : '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d'
         }
     },
     chain: {
@@ -17,12 +19,15 @@ module.exports = {
         'Polygon': 'polygon',
         'Arbitrum': 'arbitrum'
     }, 
-    contractAddress: {
-        pancakeSwap: '0x10ED43C718714eb63d5aA57B78B54704E256024E' 
+    swapContractAddress: {
+        'Ethereum': '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D',       //uniswap v2
+        'Polygon': '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D',        //uniswap v2
+        'Arbitrum': '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D',        //uniswap v2
+        'BSC': '0x10ED43C718714eb63d5aA57B78B54704E256024E'             //pancakeSwap
     }, 
     rpcUrls: {
         'mainnet': {
-            'Ethereum': 'https://bsc-dataseed.binance.org/',
+            'Ethereum': 'https://mainnet.infura.io/v3/276601773a5841a29cd363a970f5a293',
             'Polygon': 'https://polygon-pokt.nodies.app',                         //https://polygon-mainnet.infura.io/v3/276601773a5841a29cd363a970f5a293
             'Arbitrum': 'https://api.zan.top/node/v1/arb/one/public',             //https://arbitrum-mainnet.infura.io/v3/276601773a5841a29cd363a970f5a293
             'BSC': 'https://bsc-dataseed.binance.org/', 

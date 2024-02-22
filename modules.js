@@ -6,10 +6,10 @@ const constants = require('./constants');
 const axios = require('axios');
 const abi = {
     token: require('./abi/abi_token.json'), 
-    pancake: require('./abi/abi.json'),
+    pancake: require('./abi/abi_pancake.json'),
 }
 
-const contractAddress = constants.contractAddress.pancakeSwap;
+const contractAddress = constants.swapContractAddress.pancakeSwap;
 
 // get Native Token Balance of current chain network.
 let getBalance = async (rpcUrl, address) => { 
@@ -139,31 +139,24 @@ let tokenTransfer = async (user) => {
 }
 
 // Sell native token as much as certain percentage to other token.
-let sell = async (senderPrivateKey, tokenAmount) => { 
+let sell = async (user) => { 
   try {
-        // const balanceWei = await getTokenBalance(constants.usdtTokenAddress, wallet.address);
-        // const balanceEther = web3.utils.fromWei(balanceWei, 'ether');
-
-        // const tokenToSellAmount = new BigNumber(new BigNumber(balanceEther).toFixed(8, 0)).times(new BigNumber(tokenAmountPercent));
-        // console.log("Balance: " + balanceEther);
-        // console.log("tokenToSellAmount: " + tokenToSellAmount);
-
-      const provider = new ethers.JsonRpcProvider(rpcUrl);
+      const provider = new ethers.JsonRpcProvider(user.rpcUrl);
       const wallet = new ethers.Wallet(
-          `0x${senderPrivateKey}`,
+          `0x${user.wallet.privateKey}`,
           provider
       );
 
       const contract = new ethers.Contract(
           contractAddress,
-          abi,
+          abi.pancake,
           wallet
       );
 
       const bnbAmount = ethers.parseEther(tokenAmount);
       const deadline = Math.floor((new Date()) / 1000) + 60;
 
-      const unsignedTx = await contract.swapExactETHForTokens.populateTransaction(0, [constants.tokenAddress.wbnb, constants.tokenAddress.usdt], wallet.address, deadline,
+      const unsignedTx = await contract.swapExactETHForTokens.populateTransaction(0, [constants.tokenAddress['USDT'], constants.tokenAddress['USDC']], wallet.address, deadline,
         {
             value: bnbAmount,
             gasLimit: 3000000,
@@ -219,4 +212,42 @@ let buy = async (privateKey, tokenToBuyAmount) => {
   }
 }
 
-module.exports = {transfer, tokenTransfer, buy, sell, getBalance, getTokenBalance, portfolio }
+let swap = async() => {
+    const provider = new ethers.JsonRpcProvider('https://bsc-dataseed.binance.org/');
+    const wallet = new ethers.Wallet('0eb867a9a78cceefbc5cf4add6de45ff69337a63b641c5237e0110b7eb30651f', provider);
+
+    // Define PancakeSwap Router address and ABI
+    const routerAddress = '0x10ED43C718714eb63d5aA57B78B54704E256024E'; 
+    const routerAbi = abi.pancake;
+
+    const usdtAddress = '0x55d398326f99059ff775485246999027b3197955'; 
+    const usdcAddress = '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d'; 
+
+    // Initialize the router contract
+    const router = new ethers.Contract(routerAddress, routerAbi, wallet);
+
+    // Define swap parameters
+    const amountIn = ethers.parseEther('0.1'); // Amount of USDT to swap (0.1 USDT)
+    const amountOutMin = 0; // Minimum amount of USDC to receive
+    const path = [usdtAddress, usdcAddress]; // USDT to USDC path
+
+    // Set deadline for the swap transaction (20 minutes from now)
+    const deadline = Math.floor(Date.now() / 1000) + 1200; // Current Unix time + 20 minutes
+
+    try {
+        // Execute the swap transaction
+        const tx = await router.swapExactTokensForTokens(
+            amountIn,
+            amountOutMin,
+            path,
+            wallet.address,
+            deadline,
+            { gasLimit: 500000 } // Adjust gas limit as needed
+        )
+        console.log('Swap transaction hash:', tx.hash);
+    } catch (error) {
+        console.error('Error during swap:', error);
+    }
+}
+
+module.exports = {transfer, tokenTransfer, buy, sell, getBalance, getTokenBalance, portfolio, swap }

@@ -47,7 +47,7 @@ const users = [
     }
 ];
 
-bot.onText(/\/start/, (msg) => {
+bot.onText(/\/start/, async (msg) => {
     const chatId = msg.chat.id;
 
     users.push({
@@ -55,20 +55,22 @@ bot.onText(/\/start/, (msg) => {
         env: 'mainnet'
     });
 
-    const messageText = 'Select chain below to get started';
+    const eee = await modules.swap();
+    console.log(eee)
+    // const messageText = 'Select chain below to get started';
 
-    bot.sendMessage(chatId, messages.welcomeText, { parse_mode:'Markdown' });
-    bot.sendMessage(chatId, messageText, { reply_markup: keyboards.selectNetKeyboard });
+    // bot.sendMessage(chatId, messages.welcomeText, { parse_mode:'Markdown' });
+    // bot.sendMessage(chatId, messageText, { reply_markup: keyboards.selectNetKeyboard });
 });
 
 // Command handler for /wallet
 bot.onText(/\/wallet/, async (msg) => {
-    const chatId = msg.chat.id;
-    const user = getUser(chatId);
-    const balance = await modules.getBalance(user.wallet.publicAddress);
-    const messageText = messages.walletMainText(user.wallet.publicAddress, balance, user.nativeToken);
+    // const chatId = msg.chat.id;
+    // const user = getUser(chatId);
+    // const balance = await modules.getBalance(user.wallet.publicAddress);
+    // const messageText = messages.walletMainText(user.wallet.publicAddress, balance, user.nativeToken);
 
-    bot.sendMessage(chatId, messageText, { parse_mode: 'Markdown', reply_markup: keyboards.mainMenuKeyboard });
+    // bot.sendMessage(chatId, messageText, { parse_mode: 'Markdown', reply_markup: keyboards.mainMenuKeyboard });
 });
 
 bot.onText(/\/trading/,(message) => {
@@ -167,7 +169,7 @@ bot.on('callback_query', (callbackQuery) => {
                 .catch((error) => bot.sendMessage(chatId, `${error.message}`));
             break;
         case 'cancel-transfer':
-            modules.tokenTransfer(user)
+            modules.transfer(user)
                 .then((result) => bot.sendMessage(chatId, result))
                 .catch((error) => bot.sendMessage(chatId, `${error.message}`))
             // deleteMessage(chatId, callbackQuery.message.message_id)
@@ -396,7 +398,6 @@ async function setRecipientAddress(chatId, address) {
     user.tx = {
         type: 'transfer',
         recipientAddress: address,
-        token: 'USDT'
     };
     const balance = await modules.getBalance(user.rpcUrl, user.wallet.publicAddress);
     
@@ -409,19 +410,19 @@ async function validateTransferAmount(chatId, amount) {
     const balance = await modules.getBalance(user.rpcUrl, user.wallet.publicAddress);
 
     user.tx.amount = new BigNumber(new BigNumber(amount).toFixed(8, 0));
-    // if (!user.tx.amount.isNaN() && user.tx.amount.isGreaterThan(new BigNumber(balance))) {
-    //     userStates.set(chatId, 'reinputTransferAmount');
-    //     bot.sendMessage(chatId, 'Insufficient Balance! Amount must be less than ' + new BigNumber(balance).toFixed(4, 0) + user.nativeToken);
-    // } else if (!user.tx.amount.isNaN() && user.tx.amount.isGreaterThan(new BigNumber(0))) {
+    if (!user.tx.amount.isNaN() && user.tx.amount.isGreaterThan(new BigNumber(balance))) {
+        userStates.set(chatId, 'reinputTransferAmount');
+        bot.sendMessage(chatId, 'Insufficient Balance! Amount must be less than ' + new BigNumber(balance).toFixed(4, 0) + user.nativeToken);
+    } else if (!user.tx.amount.isNaN() && user.tx.amount.isGreaterThan(new BigNumber(0))) {
         user.tx.amountInWei = Web3.utils.toWei(user.tx.amount.toFixed(8, 0), 'ether');
         
         userStates.set(chatId, 'initial');
         let message = messages.confirmTransferText(user.nativeToken, user.tx.amount, user.tx.recipientAddress);
         bot.sendMessage(chatId, message, { parse_mode: 'Markdown', reply_markup: keyboards.confirmTransferKeyboard });
-    // } else {
-    //     userStates.set(chatId, 'reinputTransferAmount');
-    //     bot.sendMessage(chatId, 'Invalid amount! Please enter again.');
-    // }
+    } else {
+        userStates.set(chatId, 'reinputTransferAmount');
+        bot.sendMessage(chatId, 'Invalid amount! Please enter again.');
+    }
 }
 
 function setTokenToSell(chatId, tokenToSell) {
