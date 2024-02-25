@@ -48,7 +48,7 @@ let portfolio = async (user) => {
     const tokensInWallet = await axios.get(
         "https://deep-index.moralis.io/api/v2/" +
         user.wallet.publicAddress +
-        "/erc20?chain=bsc",
+        "/erc20?chain=" + constants.chain[user.chainNetwork],
         {
             headers: {
                 "X-API-Key":
@@ -148,21 +148,20 @@ let sell = async (user) => {
       );
 
       const contract = new ethers.Contract(
-          contractAddress,
+          constants.swapContractAddress[user.chainNetwork],
           abi.pancake,
           wallet
       );
 
-      const bnbAmount = ethers.parseEther(tokenAmount);
       const deadline = Math.floor((new Date()) / 1000) + 60;
 
-      const unsignedTx = await contract.swapExactETHForTokens.populateTransaction(0, [constants.tokenAddress['USDT'], constants.tokenAddress['USDC']], wallet.address, deadline,
+      const unsignedTx = await contract.swapExactETHForTokens.populateTransaction(0, [constants.tokenContractAddress[user.chainNetwork]['MAIN'], constants.tokenContractAddress[user.chainNetwork][user.tx.receiveToken]], wallet.address, deadline,
         {
-            value: bnbAmount,
-            gasLimit: 3000000,
+            value: user.tx.amountInWei,
         }
       );
-      
+
+      console.log('Sent!!!');
       const transactionHash = (await wallet.sendTransaction(unsignedTx)).hash;
 
       // const result = await tx.wait()
@@ -172,43 +171,52 @@ let sell = async (user) => {
   } catch (error) {
       console.log(error);
       console.log('Error:' + error.message);
-      return error.message;
+      return error.shortMessage;
   }
 }
 
 // buy native token as much as input amount with other token hold in wallet.
-let buy = async (privateKey, tokenToBuyAmount) => { 
+let buy = async (user) => { 
   try {
-    const provider = new ethers.JsonRpcProvider(rpcUrl);
+    const provider = new ethers.JsonRpcProvider(user.rpcUrl);
     const wallet = new ethers.Wallet(
-        `0x${privateKey}`,
+        `0x${user.wallet.privateKey}`,
         provider
     );
 
-    const contract = new ethers.Contract(
-        contractAddress,
-        abi,
+    const tokenContractAddress = constants.tokenContractAddress[user.chainNetwork][user.tx.buyWithToken];
+    const tokenContract = new ethers.Contract(
+        tokenContractAddress,
+        abi.token,
         wallet
     );
 
-    const amountIn = ethers.parseEther('0.0001');
-    console.log("Amount:" + amountIn);
+    const tokenBalance = getTokenBalance(tokenContractAddress, user);
+    const approveTx = await tokenContract.approve.populateTransaction(constants.swapContractAddress[user.chainNetwork], Web3.utils.toWei(tokenBalance, 'ether'));
+    const result = await wallet.sendTransaction(approveTx);
+    if (!result.hash) {
+        return "Transaction Approve Failed!";
+    }
+
+    const contract = new ethers.Contract(
+        constants.swapContractAddress[user.chainNetwork],
+        abi.pancake,
+        wallet
+    );
+
     const deadline = Math.floor((new Date()) / 1000) + 60;
 
-    const unsignedTx = await contract.swapExactTokensForETH.populateTransaction(amountIn, 0, [constants.tokenAddress.usdt, constants.tokenAddress.wbnb], wallet.address, deadline, {
-        gasLimit: 3000000
-    });
-    
-    const transactionHash = (await wallet.sendTransaction(unsignedTx)).hash;
+    const unsignedTx = await contract.swapTokensForExactETH.populateTransaction(Web3.utils.toWei('0.001', 'ether'), Web3.utils.toWei(tokenBalance, 'ether'), [tokenContractAddress, constants.tokenContractAddress[user.chainNetwork]['MAIN']], wallet.address, deadline);
 
-    // const result = await tx.wait()
-    const explorerUrl = `https://bscscan.com/tx/${transactionHash}`;
-    console.log('TransactionHash:' + transactionHash);
+    const recipient = (await wallet.sendTransaction(unsignedTx));
+
+    const explorerUrl = `https://bscscan.com/tx/${recipient.hash}`;
+    console.log('TransactionHash:' + recipient.hash);
     return explorerUrl;
   } catch (error) {
       console.log(error);
       console.log('Error:' + error.message);
-      return error.message;
+      return error.shortMessage;
   }
 }
 

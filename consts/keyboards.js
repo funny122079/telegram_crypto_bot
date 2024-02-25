@@ -1,3 +1,5 @@
+const constants = require("../constants");
+
 const mainMenuKeyboard = {
     inline_keyboard: [
         [{ text: '↔ Send Coin', callback_data: 'transfer'}, { text: '💱 Token Balances', callback_data: 'token-balances'}], 
@@ -23,21 +25,6 @@ const createOrImportKeyboard = {
 const confirmTransferKeyboard = {
     inline_keyboard: [
         [{ text: '✅ Confirm', callback_data: 'confirm-transfer'}, { text: '❌ Cancel', callback_data: 'cancel-transfer' }],
-    ],
-};
-
-const setTokenToSellKeyboard = {
-    inline_keyboard: [
-        [
-            { text: 'DAI', callback_data: 'token-to-buy:DAI' }, 
-            { text: 'ETH', callback_data: 'token-to-buy:ETH' },
-            { text: 'USDT', callback_data: 'token-to-buy:USDT' }
-        ],
-        [
-            { text: 'BNB', callback_data: 'token-to-buy:BNB' },
-            { text: 'BNB', callback_data: 'token-to-buy:BNB' },
-            { text: 'CTX', callback_data: 'token-to-buy:CTX' }
-        ],
     ],
 };
 
@@ -95,26 +82,17 @@ const tradingSettingKeyboard = {
 const selectSellAmountKeyboard = {
     inline_keyboard: [
         [
-            { text: '10%', callback_data: 'input-sell-amount:10'},
-            { text: '15%', callback_data: 'input-sell-amount:15' },
-            { text: '25%', callback_data: 'input-sell-amount:25' },
+            { text: '10%', callback_data: 'select-sell-amount:10'},
+            { text: '15%', callback_data: 'select-sell-amount:15' },
+            { text: '25%', callback_data: 'select-sell-amount:25' },
         ],
         [
-            { text: '50%', callback_data: 'input-sell-amount:50' },
-            { text: '75%', callback_data: 'input-sell-amount:75' },
-            { text: '100%', callback_data: 'input-sell-amount:100' },
+            { text: '50%', callback_data: 'select-sell-amount:50' },
+            { text: '75%', callback_data: 'select-sell-amount:75' },
+            { text: '100%', callback_data: 'select-sell-amount:100' },
         ],
         [
             { text: 'Custom', callback_data: 'input-sell-amount-custom' }
-        ],
-    ],
-};
-
-const confirmBuyKeyboard = {
-    inline_keyboard: [
-        [
-            { text: '✅ Confirm', callback_data: 'confirm-buy'},
-            { text: '❌ Cancel', callback_data: 'cancel-buy' }
         ],
     ],
 };
@@ -128,16 +106,64 @@ const confirmSellKeyboard = {
     ],
 };
 
-const receiveTokenKeyboard = {
+const receiveTokenKeyboard = (user) => {
+    const tokens = constants.receivableTokens[user.chainNetwork];
+    let keyboard = [];
+    tokens.map((token) => {
+        const item = {
+            text: token, callback_data:'input-receive-token:' + token
+        }
+        keyboard.push(item);
+    });
+
+    return {
+        inline_keyboard: [
+            keyboard
+        ]
+    }
+};
+
+const buyAmountKeyboard = {
     inline_keyboard: [
         [
-            { text: 'ETH', callback_data: 'input-receive-token:ETH' },
-            { text: 'USDC', callback_data: 'input-receive-token:USDC' }
+            { text: '0.1', callback_data: 'select-buy-amount:0.1' },
+            { text: '0.3', callback_data: 'select-buy-amount:0.3' },
+            { text: '0.5', callback_data: 'select-buy-amount:0.5' },
+        ],
+        [
+            { text: '1', callback_data: 'select-buy-amount:1' },
+            { text: 'Custom:--', callback_data: 'custom-buy-amount' },
+        ],
+    ],
+};
+
+const buyWithTokenKeyboard = (user) => {
+    const tokens = constants.receivableTokens[user.chainNetwork];
+    let keyboard = [];
+    tokens.map((token) => {
+        const item = {
+            text: token, callback_data:'select-buy-with-token:' + token
+        }
+        keyboard.push(item);
+    });
+
+    return {
+        inline_keyboard: [
+            keyboard
         ]
+    }
+};
+
+const confirmBuyKeyboard = {
+    inline_keyboard: [
+        [
+            { text: '✅ Confirm', callback_data: 'confirm-buy'},
+            { text: '❌ Cancel', callback_data: 'cancel-buy' }
+        ],
     ],
 };
 
 module.exports = { 
-    mainMenuKeyboard, selectNetKeyboard, createOrImportKeyboard, confirmTransferKeyboard, setTokenToSellKeyboard, settingBuyLimitKeyboard, 
-    settingMenuKeyboard, switchingEnvKeyboard, tradingSettingKeyboard, selectSellAmountKeyboard, confirmBuyKeyboard, confirmSellKeyboard, receiveTokenKeyboard 
+    mainMenuKeyboard, selectNetKeyboard, createOrImportKeyboard, confirmTransferKeyboard, settingBuyLimitKeyboard, buyAmountKeyboard,
+    settingMenuKeyboard, switchingEnvKeyboard, tradingSettingKeyboard, selectSellAmountKeyboard, confirmBuyKeyboard, confirmSellKeyboard, receiveTokenKeyboard, buyWithTokenKeyboard 
 }

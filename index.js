@@ -47,30 +47,29 @@ const users = [
     }
 ];
 
-bot.onText(/\/start/, async (msg) => {
+// ============= Command Handler =====================
+bot.onText(/\/start/, (msg) => {
     const chatId = msg.chat.id;
 
     users.push({
         chatId: chatId,
-        env: 'mainnet'
+        env: 'testnet'
     });
 
-    const eee = await modules.swap();
-    console.log(eee)
-    // const messageText = 'Select chain below to get started';
+    const messageText = 'Select chain below to get started';
 
-    // bot.sendMessage(chatId, messages.welcomeText, { parse_mode:'Markdown' });
-    // bot.sendMessage(chatId, messageText, { reply_markup: keyboards.selectNetKeyboard });
+    bot.sendMessage(chatId, messages.welcomeText, { parse_mode:'Markdown' });
+    bot.sendMessage(chatId, messageText, { reply_markup: keyboards.selectNetKeyboard });
 });
 
 // Command handler for /wallet
 bot.onText(/\/wallet/, async (msg) => {
-    // const chatId = msg.chat.id;
-    // const user = getUser(chatId);
-    // const balance = await modules.getBalance(user.wallet.publicAddress);
-    // const messageText = messages.walletMainText(user.wallet.publicAddress, balance, user.nativeToken);
+    const chatId = msg.chat.id;
+    const user = getUser(chatId);
+    const balance = await modules.getBalance(user.wallet.publicAddress);
+    const messageText = messages.walletMainText(user.wallet.publicAddress, balance, user.nativeToken);
 
-    // bot.sendMessage(chatId, messageText, { parse_mode: 'Markdown', reply_markup: keyboards.mainMenuKeyboard });
+    bot.sendMessage(chatId, messageText, { parse_mode: 'Markdown', reply_markup: keyboards.mainMenuKeyboard });
 });
 
 bot.onText(/\/trading/,(message) => {
@@ -88,7 +87,7 @@ bot.onText(/\/buy/,(message) => {
     buy(chatId);
 });
 
-// Listen for inline keyboard button presses
+// ================= Listen for inline keyboard button presses =========================
 bot.on('callback_query', (callbackQuery) => {
     const chatId = callbackQuery.message.chat.id;
     const user = getUser(chatId);
@@ -105,17 +104,21 @@ bot.on('callback_query', (callbackQuery) => {
         case 'import-wallet':
             importWallet(chatId);
             break;
+        // ====== Buy Token ======
         case 'buy':
             buy(chatId, param1);
             break;
-        case 'input-buy-token':
-            inputBuyToken(chatId, param1);
+        case 'select-buy-amount':
+            selectBuyAmount(chatId, param1);
             break;
         case 'custom-buy-token':
             customBuyToken(chatId, param1);
             break;
+        case 'select-buy-with-token':
+            selectBuyWithToken(chatId, param1);
+            break;
         case 'confirm-buy':
-            modules.buy(user.wallet.privateKey, "0.001")
+            modules.buy(user)
                 .then((result) => bot.sendMessage(chatId, result))
                 .catch((error) => bot.sendMessage(chatId, `${error.message}`));
             break;
@@ -123,8 +126,12 @@ bot.on('callback_query', (callbackQuery) => {
             bot.deleteMessage(chatId, callbackQuery.message.message_id)
                 .then(() => console.log('Message deleted successfully!'));
             break;
+        // ====== Sell Token =========
         case 'sell':
             sell(chatId, param1);
+            break;
+        case 'select-sell-amount':
+            selectSellAmount(chatId, param1);
             break;
         case 'input-sell-amount':
             inputSellAmount(chatId, param1);
@@ -139,7 +146,7 @@ bot.on('callback_query', (callbackQuery) => {
             customSellToken(chatId, param1);
             break;
         case 'confirm-sell':
-            modules.sell(user.wallet.privateKey, '0.0001')
+            modules.sell(user)
                 .then((result) => bot.sendMessage(chatId, result))
                 .catch((error) => bot.sendMessage(chatId, `${error.message}`));
             break;
@@ -169,11 +176,8 @@ bot.on('callback_query', (callbackQuery) => {
                 .catch((error) => bot.sendMessage(chatId, `${error.message}`));
             break;
         case 'cancel-transfer':
-            modules.transfer(user)
-                .then((result) => bot.sendMessage(chatId, result))
-                .catch((error) => bot.sendMessage(chatId, `${error.message}`))
-            // deleteMessage(chatId, callbackQuery.message.message_id)
-            //     .then(() => console.log('Message deleted successfully!'));;
+            deleteMessage(chatId, callbackQuery.message.message_id)
+                .then(() => console.log('Message deleted successfully!'));;
             break;
         case 'token-to-sell':
             setTokenToSell(chatId, param1);
@@ -266,13 +270,13 @@ bot.on('callback_query', (callbackQuery) => {
     }
 });
 
-// Listen for polling_error
+//  ====================== Listen for polling_error ================================
 bot.on('polling_error', (error) => {
     console.log(error.code);         // => 'EFATAL'
     console.log(error.message);
 });
 
-// Listen for message
+// ======================= Listen for message =============================
 bot.on('message', (message) => {
     const chatId = message.chat.id;
     const currentState = userStates.get(chatId);
@@ -306,13 +310,15 @@ bot.on('message', (message) => {
     }
 });
 
+//  ====================== Common function ===========================
 //get User Object from charId
 function getUser(chatId) {
     const userWithChatId = users.find(user => user.chatId === chatId);
 
     return userWithChatId;
 }
-//function to generate wallet
+
+//  ===================  Main functionalities (create, import wallet, selectChain, main menu) =======================
 async function createWallet(chatId) {
     const user = getUser(chatId);
     if (typeof user.wallet !== 'undefined') {
@@ -331,7 +337,6 @@ async function createWallet(chatId) {
     bot.sendMessage(chatId, message, { parse_mode: 'Markdown', reply_markup: keyboards.mainMenuKeyboard });
 }
 
-//function to import wallet
 function importWallet(chatId) {
     const user = getUser(chatId);
     if (typeof user.wallet !== 'undefined') {
@@ -364,15 +369,14 @@ function importWallet(chatId) {
     });
 }
 
-//function to select wallet type from wallet type list
 function selectChain(chatId, network, nativeToken) {
     const user = getUser(chatId);
     if (network != 'Ethereum') {
         bot.sendMessage(chatId, messages.warningAdditionalPay, { parse_mode: 'Markdown' });
         return;
     }
-    user.chainNetwork = network;
-    user.nativeToken = nativeToken
+    user.chainNetwork = 'BSC';
+    user.nativeToken = 'BNB'
     user.env = 'mainnet';
     user.rpcUrl = constants.rpcUrls[user.env][user.chainNetwork];
 
@@ -383,7 +387,7 @@ function selectChain(chatId, network, nativeToken) {
     bot.sendMessage(chatId, message, { parse_mode:'Markdown', reply_markup: keyboards.createOrImportKeyboard });
 }
 
-//send coin to external wallet.  required params - recipient Address, amount
+// ===========================  Transfer ==============================
 function transfer(chatId) {
     bot.sendMessage(chatId, messages.inputTransferRecipientText);
     
@@ -425,102 +429,28 @@ async function validateTransferAmount(chatId, amount) {
     }
 }
 
-function setTokenToSell(chatId, tokenToSell) {
-    let message = messages.selectTokenToSell;
-    
-    bot.sendMessage(chatId, message, { parse_mode: 'Markdown', reply_markup: keyboards.setTokenToSellKeyboard });
-}
-
-function setTokenToBuy(chatId, tokenToBuy) {
-    tokenToBuyAddress = tokenToBuy;
-    const messageText1 = '*Here are some stategies for crypto trading :*\n' +
-        '*1* - Selecting desiredBuyPrice, desiredSellPrice and stop-loss\n' +
-        '*2* - Moving Average Crossover Strategy\n' +
-        '*3* - RSI(Relative Strength Index) Strategy \n' +
-        'Please input the number of strategy to apply.';
-
-    bot.sendMessage(chatId, messageText1, { parse_mode: 'Markdown' });
-
-    bot.once('message', (strategyNoMessage) => {
-        strategyNo = strategyNoMessage.text.trim();
-        
-        bot.sendMessage(chatId, 'Please reply with the amount of token to sell.');
-        bot.once('message', (amountToSellMessage) => {
-            amountToSell = amountToSellMessage.text.trim();
-            const messageText2 = '*Confirm Trading Information*\n' + 
-                'Token to Sell: ' + tokenToSellAddress + '\n' +
-                'Token to Buy: ' + tokenToBuyAddress + '\n' +
-                'Amount to Swap: ' + amountToSwap + '\n' +
-                'Strategy Number: ' + strategyNo + '\n';
-
-            const confirmKeyboard = {
-                inline_keyboard: [
-                    [
-                        { text: '✅ Confirm', callback_data: 'confirm-swap'},
-                        { text: '❌ Cancel', callback_data: 'cancel-swap' }
-                    ],
-                ],
-            };
-
-            bot.sendMessage(chatId, messageText2, { parse_mode: 'Markdown', reply_markup: confirmKeyboard });
-        }); 
-    });
-
-}
-
-async function buy(chatId, address) {
-    const messageText = 'Please select buy amount:';
-
-    const buyAmountKeyboard = {
-        inline_keyboard: [
-            [
-                { text: '0.1' + nativeToken, callback_data: 'input-buy-token:0.1' },
-                { text: '0.3' + nativeToken, callback_data: 'input-buy-token:0.3' },
-                { text: '0.5' + nativeToken, callback_data: 'input-buy-token:0.5' },
-            ],
-            [
-                { text: '1' + nativeToken, callback_data: 'input-buy-token:1' },
-                { text: 'Custom:--' + nativeToken, callback_data: 'custom-buy-token' },
-            ],
-        ],
-    };
-
-    bot.sendMessage(chatId, messageText, { parse_mode: 'Markdown', reply_markup: buyAmountKeyboard });
-}
-
-function inputBuyToken(chatId, amount) {
-    const user = getUser(chatId);
-    bot.sendMessage(chatId, 'Please input the token address to buy:');
-
-    bot.once('message', (buyTokenMessage) => {
-        const buyToken = buyTokenMessage.text.trim();
-        const message = messages.confirmBuyText(buyToken, amount, user.nativeToken);
-
-        bot.sendMessage(chatId, message, { parse_mode: 'Markdown', reply_markup: keyboards.confirmBuyKeyboard });
-    });
-}
-
-function customBuyToken(chatId) {
-    bot.sendMessage(chatId, 'Please input the custom buy amount:');
-
-    bot.once('message', (buyTokenAmountMessage) => {
-        const buyTokenAmount = buyTokenAmountMessage.text.trim();
-        
-        bot.sendMessage(chatId, 'Please input the token address to buy:');
-
-        bot.once('message', (buyTokenMessage) => {
-            const buyToken = buyTokenMessage.text.trim();
-            const message = messages.confirmBuyText(buyToken, buyTokenAmount, user.nativeToken);
-
-            bot.sendMessage(chatId, message, { parse_mode: 'Markdown', reply_markup: keyboards.confirmBuyKeyboard });
-        });
-    });
-}
-
+// ============== Sell Token =========================
 async function sell(chatId) {
     const messageText = 'Please select sell amount:';
 
     bot.sendMessage(chatId, messageText, { parse_mode: 'Markdown', reply_markup: keyboards.selectSellAmountKeyboard });
+}
+
+async function selectSellAmount(chatId, percent) {
+    const user = getUser(chatId);
+
+    const balance = await modules.getBalance(user.rpcUrl, user.wallet.publicAddress);
+    const amount = balance * percent / 100;
+    const amountInWei = Web3.utils.toWei(amount, 'ether');
+
+    user.tx = {
+        amountInWei: amountInWei
+    }
+
+    const messageText = 'Please select receive token:';
+    const keyboard = keyboards.receiveTokenKeyboard(user);
+
+    bot.sendMessage(chatId, messageText, { parse_mode: 'Markdown', reply_markup: keyboard });
 }
 
 async function inputSellAmount(chatId, percent) {
@@ -540,17 +470,75 @@ async function inputSellAmount(chatId, percent) {
 
     const messageText = 'Please select receive token:';
 
-    bot.sendMessage(chatId, messageText, { parse_mode: 'Markdown', reply_markup: keyboards.receiveTokenKeyboard });
+    bot.sendMessage(chatId, messageText, { parse_mode: 'Markdown', reply_markup: keyboards.receiveTokenKeyboard(user) });
 }
 
 function inputReceiveToken(chatId, receiveToken) {
     const user = getUser(chatId);
+    if (!user.tx) {
+        console.log('Error: Transaction not found.');
+        return;
+    }
+
     user.tx.receiveToken = receiveToken;
-    let message = messages.confirmSellText(user.tx.receiveToken, user.tx.amountPercent);
+    let message = messages.confirmSellText(user);
     
     bot.sendMessage(chatId, message, { parse_mode: 'Markdown', reply_markup: keyboards.confirmSellKeyboard });
 }
 
+// ============ Buy Functionality ==================
+async function buy(chatId, address) {
+    const messageText = 'Please select buy amount:';
+    bot.sendMessage(chatId, messageText, { parse_mode: 'Markdown', reply_markup: keyboards.buyAmountKeyboard });
+}
+
+function selectBuyAmount(chatId, amount) {
+    const user = getUser(chatId);
+    const amountInWei = Web3.utils.toWei(amount, 'ether');
+    if (user.tx) {
+        return;
+    }
+
+    user.tx = {
+        amountInWei: amountInWei
+    }
+    const messageText = 'Please select token to buy with:';
+    const keyboard = keyboards.buyWithTokenKeyboard(user);
+
+    bot.sendMessage(chatId, messageText, { parse_mode: 'Markdown', reply_markup: keyboard });
+}
+
+function customBuyToken(chatId) {
+    bot.sendMessage(chatId, 'Please input the custom buy amount:');
+
+    bot.once('message', (buyTokenAmountMessage) => {
+        const buyTokenAmount = buyTokenAmountMessage.text.trim();
+        
+        bot.sendMessage(chatId, 'Please input the token address to buy:');
+
+        bot.once('message', (buyTokenMessage) => {
+            const buyToken = buyTokenMessage.text.trim();
+            const message = messages.confirmBuyText(buyToken, buyTokenAmount, user.nativeToken);
+
+            bot.sendMessage(chatId, message, { parse_mode: 'Markdown', reply_markup: keyboards.confirmBuyKeyboard });
+        });
+    });
+}
+
+function selectBuyWithToken(chatId, token) {
+    const user = getUser(chatId);
+    if (!user.tx) {
+        console.log('Error: Transaction not found.');
+        return;
+    }
+
+    user.tx.buyWithToken = token;
+    let message = messages.confirmBuyText(user);
+    
+    bot.sendMessage(chatId, message, { parse_mode: 'Markdown', reply_markup: keyboards.confirmBuyKeyboard });
+}
+
+//  ========== Buy Limit ============
 function inputBuyLimitToken(chatId) {
     const messageText = 'Please select token to buy:';
 
@@ -801,6 +789,43 @@ function tradingSetPeriod(chatId, oldMessageId, currentInlineKeyboard) {
             message_id: oldMessageId
         });
     });
+}
+
+function setTokenToBuy(chatId, tokenToBuy) {
+    tokenToBuyAddress = tokenToBuy;
+    const messageText1 = '*Here are some stategies for crypto trading :*\n' +
+        '*1* - Selecting desiredBuyPrice, desiredSellPrice and stop-loss\n' +
+        '*2* - Moving Average Crossover Strategy\n' +
+        '*3* - RSI(Relative Strength Index) Strategy \n' +
+        'Please input the number of strategy to apply.';
+
+    bot.sendMessage(chatId, messageText1, { parse_mode: 'Markdown' });
+
+    bot.once('message', (strategyNoMessage) => {
+        strategyNo = strategyNoMessage.text.trim();
+        
+        bot.sendMessage(chatId, 'Please reply with the amount of token to sell.');
+        bot.once('message', (amountToSellMessage) => {
+            amountToSell = amountToSellMessage.text.trim();
+            const messageText2 = '*Confirm Trading Information*\n' + 
+                'Token to Sell: ' + tokenToSellAddress + '\n' +
+                'Token to Buy: ' + tokenToBuyAddress + '\n' +
+                'Amount to Swap: ' + amountToSwap + '\n' +
+                'Strategy Number: ' + strategyNo + '\n';
+
+            const confirmKeyboard = {
+                inline_keyboard: [
+                    [
+                        { text: '✅ Confirm', callback_data: 'confirm-swap'},
+                        { text: '❌ Cancel', callback_data: 'cancel-swap' }
+                    ],
+                ],
+            };
+
+            bot.sendMessage(chatId, messageText2, { parse_mode: 'Markdown', reply_markup: confirmKeyboard });
+        }); 
+    });
+
 }
 
 async function portfolio(chatId) {

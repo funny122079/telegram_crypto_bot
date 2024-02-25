@@ -1,3 +1,5 @@
+const { default: Web3 } = require("web3");
+
 const welcomeText = '*Welcome to CryptiboBot!*\n' +  
         'We are providing high qualified service to grow your crypto trading business step by step.\n' +
         'Try it today and start automating the fantastic our several good and benefitable strategy with secure bot in our board.\n' +
@@ -48,20 +50,19 @@ const confirmTransferText = (nativeToken, amount, recipient) => {
     return message;
 }
 
-const confirmSellText = (receiveToken, amount) => {
+const confirmSellText = (user) => {
     let message = '*======= Please confirm the information ==========*\n' + 
-        '*ReceiveToken: *' + receiveToken +
-        '\n*Amount: *' + amount + '%' +
-        '\nDo you really  token?';
+        '*Amount to sell: *' + Web3.utils.fromWei(user.tx.amountInWei, 'ether') + user.nativeToken + 
+        '\n*Receive Token: *' + user.tx.receiveToken + 
+        '\nDo you really approve this transaction?';
 
     return message;
 }
 
-const confirmBuyText = (buyToken, buyTokenAmount, nativeToken) => {
+const confirmBuyText = (user) => {
     let message = '*======= Please confirm the information ==========*\n' + 
-        '*BuyTokenAddress: *' + buyToken +
-        '\n*Amount: *' + buyTokenAmount + 
-        '\n*Buy with: *' + nativeToken + 
+        '\n*Amount to Buy: *' + Web3.utils.fromWei(user.tx.amountInWei, 'ether') + user.nativeToken + 
+        '\n*Buy with: *' + user.tx.buyWithToken + 
         '\nDo you really buy token?';
 
     return message;
