@@ -21,6 +21,12 @@ module.exports = {
         'Arbitrum': 'arbitrum',
         'BSC': 'bsc',
     }, 
+    chainPlatformID: {
+        'Ethereum': 'ethereum',
+        'Polygon': 'polygon-pos',
+        'Arbitrum': 'arbitrum-one',
+        'BSC': 'binance-smart-chain'
+    },
     swapContractAddress: {
         'Ethereum': '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D',       //uniswap v2
         'Polygon': '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D',        //uniswap v2

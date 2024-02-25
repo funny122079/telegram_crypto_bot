@@ -9,9 +9,10 @@ const {Web3} = require('web3');
 const EthereumAddress = require('ethereum-address');
 const constants = require('./constants');
 const modules = require('./modules');
-const main = require('./main');
+const validate = require('./validate');
 const keyboards = require('./consts/keyboards');
 const messages = require('./consts/messageTexts');
+const axios = require('axios');
 
 // define some variables
 const userStates = new Map();
@@ -48,9 +49,8 @@ const users = [
 ];
 
 // ============= Command Handler =====================
-bot.onText(/\/start/, (msg) => {
+bot.onText(/\/start/, async(msg) => {
     const chatId = msg.chat.id;
-
     users.push({
         chatId: chatId,
         env: 'testnet'
@@ -66,7 +66,7 @@ bot.onText(/\/start/, (msg) => {
 bot.onText(/\/wallet/, async (msg) => {
     const chatId = msg.chat.id;
     const user = getUser(chatId);
-    const balance = await modules.getBalance(user.wallet.publicAddress);
+    const balance = await modules.getBalance(user.rpcUrl, user.wallet.publicAddress);
     const messageText = messages.walletMainText(user.wallet.publicAddress, balance, user.nativeToken);
 
     bot.sendMessage(chatId, messageText, { parse_mode: 'Markdown', reply_markup: keyboards.mainMenuKeyboard });
@@ -111,8 +111,8 @@ bot.on('callback_query', (callbackQuery) => {
         case 'select-buy-amount':
             selectBuyAmount(chatId, param1);
             break;
-        case 'custom-buy-token':
-            customBuyToken(chatId, param1);
+        case 'custom-buy-amount':
+            customBuyAmount(chatId, param1);
             break;
         case 'select-buy-with-token':
             selectBuyWithToken(chatId, param1);
@@ -305,6 +305,9 @@ bot.on('message', (message) => {
         case 'reinputTransferAmount':
             validateTransferAmount(chatId, message.text.trim());
             break;
+        case 'customBuyAmount':
+            inputCustomBuyAmount(chatId, message.text.trim());
+            break;
         default:
             break;
     }
@@ -358,7 +361,7 @@ function importWallet(chatId) {
 
             const balance = await modules.getBalance(user.rpcUrl, user.wallet.publicAddress);
 
-            const message = messages.walletImportedText(user.wallet.publicAddress, parseFloat(balance).toFixed(4), user.nativeToken);
+            const message = messages.walletImportedText(user.wallet.publicAddress, balance, user.nativeToken);
     
             bot.sendMessage(chatId, message, { parse_mode: 'Markdown', reply_markup: keyboards.mainMenuKeyboard });
         } catch (error) {
@@ -487,9 +490,11 @@ function inputReceiveToken(chatId, receiveToken) {
 }
 
 // ============ Buy Functionality ==================
-async function buy(chatId, address) {
+async function buy(chatId) {
     const messageText = 'Please select buy amount:';
-    bot.sendMessage(chatId, messageText, { parse_mode: 'Markdown', reply_markup: keyboards.buyAmountKeyboard });
+    const user = getUser(chatId);
+    delete user.tx;
+    bot.sendMessage(chatId, messageText, { parse_mode: 'Markdown', reply_markup: keyboards.buyAmountKeyboard(user) });
 }
 
 function selectBuyAmount(chatId, amount) {
@@ -500,7 +505,8 @@ function selectBuyAmount(chatId, amount) {
     }
 
     user.tx = {
-        amountInWei: amountInWei
+        amount: amount,
+        amountInWei: amountInWei,
     }
     const messageText = 'Please select token to buy with:';
     const keyboard = keyboards.buyWithTokenKeyboard(user);
@@ -508,31 +514,46 @@ function selectBuyAmount(chatId, amount) {
     bot.sendMessage(chatId, messageText, { parse_mode: 'Markdown', reply_markup: keyboard });
 }
 
-function customBuyToken(chatId) {
+function customBuyAmount(chatId) {
     bot.sendMessage(chatId, 'Please input the custom buy amount:');
-
-    bot.once('message', (buyTokenAmountMessage) => {
-        const buyTokenAmount = buyTokenAmountMessage.text.trim();
-        
-        bot.sendMessage(chatId, 'Please input the token address to buy:');
-
-        bot.once('message', (buyTokenMessage) => {
-            const buyToken = buyTokenMessage.text.trim();
-            const message = messages.confirmBuyText(buyToken, buyTokenAmount, user.nativeToken);
-
-            bot.sendMessage(chatId, message, { parse_mode: 'Markdown', reply_markup: keyboards.confirmBuyKeyboard });
-        });
-    });
+    userStates.set(chatId, 'customBuyAmount');
 }
 
-function selectBuyWithToken(chatId, token) {
+function inputCustomBuyAmount(chatId, amount) {
+    const user = getUser(chatId);
+    const amountInWei = Web3.utils.toWei(amount, 'ether');
+    userStates.set(chatId, 'initial');
+
+    if (user.tx) {    
+        return;
+    }
+
+    user.tx = {
+        amount: amount,
+        amountInWei: amountInWei,
+    }
+    const messageText = 'Please select token to buy with:';
+    const keyboard = keyboards.buyWithTokenKeyboard(user);
+
+    bot.sendMessage(chatId, messageText, { parse_mode: 'Markdown', reply_markup: keyboard });
+}
+
+async function selectBuyWithToken(chatId, token) {
     const user = getUser(chatId);
     if (!user.tx) {
         console.log('Error: Transaction not found.');
         return;
     }
 
+    const validateRes = await main.validateBuy(user, token);
+
+    if (!validateRes.status) {
+        bot.sendMessage(chatId, messages.warningBalance);
+        return;
+    }
+
     user.tx.buyWithToken = token;
+    user.tx.needTokenAmount = validateRes.tokenAmount;
     let message = messages.confirmBuyText(user);
     
     bot.sendMessage(chatId, message, { parse_mode: 'Markdown', reply_markup: keyboards.confirmBuyKeyboard });

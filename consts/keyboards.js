@@ -123,18 +123,20 @@ const receiveTokenKeyboard = (user) => {
     }
 };
 
-const buyAmountKeyboard = {
-    inline_keyboard: [
-        [
-            { text: '0.1', callback_data: 'select-buy-amount:0.1' },
-            { text: '0.3', callback_data: 'select-buy-amount:0.3' },
-            { text: '0.5', callback_data: 'select-buy-amount:0.5' },
-        ],
-        [
-            { text: '1', callback_data: 'select-buy-amount:1' },
-            { text: 'Custom:--', callback_data: 'custom-buy-amount' },
-        ],
-    ],
+const buyAmountKeyboard = (user) => {
+    return {
+        inline_keyboard: [
+            [
+                { text: '0.1' + user.nativeToken, callback_data: 'select-buy-amount:0.1' },
+                { text: '0.3' + user.nativeToken, callback_data: 'select-buy-amount:0.3' },
+                { text: '0.5' + user.nativeToken, callback_data: 'select-buy-amount:0.5' },
+            ],
+            [
+                { text: '1' + user.nativeToken, callback_data: 'select-buy-amount:1' },
+                { text: 'Custom:--', callback_data: 'custom-buy-amount' },
+            ],
+        ]
+    }
 };
 
 const buyWithTokenKeyboard = (user) => {

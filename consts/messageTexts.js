@@ -15,9 +15,8 @@ const selectTokenToSell = 'Please select the Token Name to sell :';
 
 const walletMainText = (address, balance, nativeToken) => {
     let message = '*~~~~~~~~~ Your Wallet ~~~~~~~~~*\n' + 
-        '*- Address:*\n' + address + '\n\n' + 
-        '*- Balance:* ' + balance + nativeToken + '\n' +
-        'What do you want to do with the bot?';
+        '*- Address:*' + address + '\n' + 
+        '*- Balance:* ' + balance + nativeToken + '\n';
     return message;
 }
 
@@ -60,9 +59,9 @@ const confirmSellText = (user) => {
 }
 
 const confirmBuyText = (user) => {
-    let message = '*======= Please confirm the information ==========*\n' + 
+    let message = '*======= Please confirm the information ==========*' + 
         '\n*Amount to Buy: *' + Web3.utils.fromWei(user.tx.amountInWei, 'ether') + user.nativeToken + 
-        '\n*Buy with: *' + user.tx.buyWithToken + 
+        '\n*Buy with: *' + user.tx.needTokenAmount + user.tx.buyWithToken + 
         '\nDo you really buy token?';
 
     return message;
@@ -88,6 +87,7 @@ const inputTransferAmountText = (balance, nativeToken) => {
 /////////////////////////////   Warning Messages  ////////////////////////////
 const warningAdditionalPay = '*~~~~~~~~  Warning!  ~~~~~~~~*\nYou must pay additional fee for using this.\n Please select other one.';
 const warningWalletExisted = '*~~~~~~~~  Warning!  ~~~~~~~~*\nYou cannot use another wallet because you already have own wallet using on this platform.\n ';
+const warningBalance = 'Insufficient Balance! Please input amount again.';
 
 
 
@@ -95,6 +95,6 @@ const warningWalletExisted = '*~~~~~~~~  Warning!  ~~~~~~~~*\nYou cannot use ano
 
 
 module.exports = {  
-    welcomeText, inputPVTText, inputTransferRecipientText, inputTransferAmountText, selectTokenToSell, warningAdditionalPay, warningWalletExisted, 
+    welcomeText, inputPVTText, inputTransferRecipientText, inputTransferAmountText, selectTokenToSell, warningAdditionalPay, warningWalletExisted, warningBalance,
     walletMainText, walletGeneratedText, walletImportedText, chainNetSelectedText, confirmTransferText, confirmSellText, confirmBuyText, pnlAnalysisText 
 }

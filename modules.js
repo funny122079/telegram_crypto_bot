@@ -10,6 +10,17 @@ const abi = {
 }
 
 const contractAddress = constants.swapContractAddress.pancakeSwap;
+// get the latest Token price
+let getTokenPrice = async(chainNetwork, tokenContractAddress) => {
+    const chainPlatformID = constants.chainPlatformID[chainNetwork];
+    const url = `https://api.coingecko.com/api/v3/simple/token_price/${chainPlatformID}?contract_addresses=${tokenContractAddress}&vs_currencies=usd`;
+
+    const res = await axios.get(url);
+
+    const tokenPrice = res !== null ? res.data[tokenContractAddress.toLowerCase()].usd : 0;
+    console.log(`Token Price For : ${tokenPrice}$`);
+    return tokenPrice;
+}
 
 // get Native Token Balance of current chain network.
 let getBalance = async (rpcUrl, address) => { 
@@ -18,7 +29,8 @@ let getBalance = async (rpcUrl, address) => {
         const balanceWei = await web3.eth.getBalance(address);
 
         const balanceEther = web3.utils.fromWei(balanceWei, 'ether');
-        return balanceEther;
+
+        return parseFloat(balanceEther).toFixed(4);
     } catch (error) {      
         console.log(error.message);
         return error.message;
@@ -191,8 +203,8 @@ let buy = async (user) => {
         wallet
     );
 
-    const tokenBalance = getTokenBalance(tokenContractAddress, user);
-    const approveTx = await tokenContract.approve.populateTransaction(constants.swapContractAddress[user.chainNetwork], Web3.utils.toWei(tokenBalance, 'ether'));
+    const tokenBalanceInWei = getTokenBalance(tokenContractAddress, user);
+    const approveTx = await tokenContract.approve.populateTransaction(constants.swapContractAddress[user.chainNetwork], tokenBalanceInWei);
     const result = await wallet.sendTransaction(approveTx);
     if (!result.hash) {
         return "Transaction Approve Failed!";
@@ -206,7 +218,7 @@ let buy = async (user) => {
 
     const deadline = Math.floor((new Date()) / 1000) + 60;
 
-    const unsignedTx = await contract.swapTokensForExactETH.populateTransaction(Web3.utils.toWei('0.001', 'ether'), Web3.utils.toWei(tokenBalance, 'ether'), [tokenContractAddress, constants.tokenContractAddress[user.chainNetwork]['MAIN']], wallet.address, deadline);
+    const unsignedTx = await contract.swapTokensForExactETH.populateTransaction(user.tx.amountInWei, tokenBalanceInWei, [tokenContractAddress, constants.tokenContractAddress[user.chainNetwork]['MAIN']], wallet.address, deadline);
 
     const recipient = (await wallet.sendTransaction(unsignedTx));
 
@@ -258,4 +270,4 @@ let swap = async() => {
     }
 }
 
-module.exports = {transfer, tokenTransfer, buy, sell, getBalance, getTokenBalance, portfolio, swap }
+module.exports = { getTokenPrice, transfer, tokenTransfer, buy, sell, getBalance, getTokenBalance, portfolio, swap }
