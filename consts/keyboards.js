@@ -28,10 +28,22 @@ const confirmTransferKeyboard = {
     ],
 };
 
-const settingBuyLimitKeyboard = {
-    inline_keyboard: [
-        [ { text: 'Token:', callback_data: 'select-buy-limit-token' }],
-        [ { text: 'Amount:0.1ETH', callback_data: 'select-buy-limit-amount' }, { text: 'DesiredBuyPrice:72h', callback_data: 'select-buy-limit-desire-price' }],
+const settingBuyLimitKeyboard = (user) => {
+    const tokens = constants.receivableTokens[user.chainNetwork];
+    let keyboard = [];
+    
+    tokens.map((token) => {
+        const item = {
+            text: token, callback_data:'select-buy-with-limit-token:' + token
+        }
+        keyboard.push(item);
+    });
+    
+    let keyboard1 = []
+    keyboard1.push([ { text: 'Select token to buy with: 📝', callback_data: 'nothing' }]);
+    keyboard1.push(keyboard);
+    const resultKeyboard =  keyboard1.concat([
+        [ { text: 'Amount: 0.1ETH 📝', callback_data: 'input-buy-limit-amount' }, { text: 'DesiredBuyPrice:72h', callback_data: 'select-buy-limit-desire-price' }],
         [ { text: 'Add Order(%Price Change)', callback_data: 'select-buy-limit-token' }],
         [
             { text: '-10%', callback_data: 'select-buy-limit-change-price:10' },
@@ -43,9 +55,13 @@ const settingBuyLimitKeyboard = {
             { text: '-50%', callback_data: 'select-buy-limit-change-price:50' },
             { text: 'Custom', callback_data: 'select-buy-limit-change-price-custom' },
         ],
-        [ { text: 'Buy', callback_data: 'do-buy-limit' } ],
-    ],
-};
+        [ { text: '+ Add Order', callback_data: 'do-buy-limit' } ],
+    ])
+
+    return {
+        inline_keyboard: resultKeyboard
+    }
+}
 
 const settingMenuKeyboard = {
     inline_keyboard: [

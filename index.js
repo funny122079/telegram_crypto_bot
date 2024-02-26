@@ -66,6 +66,11 @@ bot.onText(/\/start/, async(msg) => {
 bot.onText(/\/wallet/, async (msg) => {
     const chatId = msg.chat.id;
     const user = getUser(chatId);
+    if (!user) {
+        bot.sendMessage(chatId, 'User account does not exist on this platform. Please start bot using /start command.');
+        return;
+    }
+
     const balance = await modules.getBalance(user.rpcUrl, user.wallet.publicAddress);
     const messageText = messages.walletMainText(user.wallet.publicAddress, balance, user.nativeToken);
 
@@ -192,8 +197,14 @@ bot.on('callback_query', (callbackQuery) => {
             portfolio(chatId);
             break;  
         case 'buy-limit':
-            inputBuyLimitToken(chatId);
+            settingBuyLimitToken(chatId);
             break;
+        case 'select-buy-with-limit-token':
+            setBuyLimitToken(chatId, param1, callbackQuery.message.message_id, callbackQuery.message.reply_markup.inline_keyboard);
+            break;    
+        case 'input-buy-limit-amount':
+            setBuyLimitAmount(chatId, callbackQuery.message.message_id, callbackQuery.message.reply_markup.inline_keyboard);
+            break;  
         case 'do-buy-limit':
             modules.transfer('0eb867a9a78cceefbc5cf4add6de45ff69337a63b641c5237e0110b7eb30651f', '0x0086bDBD8475be37eBB584e0e2dc36A8c08e183E', '0x0086bDBD8475be37eBB584e0e2dc36A8c08e183E', 1000000000000000)
                 .then((result) => bot.sendMessage(chatId, result))
@@ -545,7 +556,7 @@ async function selectBuyWithToken(chatId, token) {
         return;
     }
 
-    const validateRes = await main.validateBuy(user, token);
+    const validateRes = await validate.validateBuy(user, token);
 
     if (!validateRes.status) {
         bot.sendMessage(chatId, messages.warningBalance);
@@ -560,18 +571,88 @@ async function selectBuyWithToken(chatId, token) {
 }
 
 //  ========== Buy Limit ============
-function inputBuyLimitToken(chatId) {
-    const messageText = 'Please select token to buy:';
+function settingBuyLimitToken(chatId) {
+    const user = getUser(chatId);
+    const messageText = 'Please input all parameters for buying:';
 
-    bot.sendMessage(chatId, messageText, { parse_mode: 'Markdown', reply_markup: keyboards.settingBuyLimitKeyboard });
+    bot.sendMessage(chatId, messageText, { parse_mode: 'Markdown', reply_markup: keyboards.settingBuyLimitKeyboard(user)});
 }
 
+async function setBuyLimitToken(chatId, oldMessageId, currentInlineKeyboard) {
+    const user = getUser(chatId);
+        user.tx = {
+            tokenAddressToBuyWith: tokenAddress.text.trim()
+        }
+
+        const validateRes = await validate.validateTokenAddress(user);
+        if (!validateRes.status) {
+            bot.sendMessage(chatId, validateRes.msg);
+        } else {
+            currentInlineKeyboard[0][0].text = `Token Address to buy with:\n ${user.tx.tokenAddressToBuyWith}`;
+
+            const newKeyboard = {
+                inline_keyboard: currentInlineKeyboard
+            }
+
+            bot.editMessageReplyMarkup(newKeyboard, {
+                chat_id: chatId,
+                message_id: oldMessageId
+            });
+        }
+}
+
+function setBuyLimitAmount(chatId, oldMessageId, currentInlineKeyboard) {
+    const user = getUser(chatId);
+    const messageText = 'Please input token amount you want to buy';
+
+    let secondMessageId;
+    bot.sendMessage(chatId, messageText)
+        .then((message) => { 
+            secondMessageId = message.message_id;
+        });
+
+    bot.once('message', async (tokenAmount) => {
+        let newMessageId = tokenAmount.message_id;
+        bot.deleteMessage(chatId, newMessageId).then(() => console.log('First Message is deleted successfully!'));
+        bot.deleteMessage(chatId, secondMessageId).then(() => console.log('Second Message is deleted successfully!'));
+
+        if (!user.tx) {
+            bot.sendMessage(chatId, 'Transaction does not exist.');
+            return;
+        }
+
+        user.tx.tokenAmount = tokenAmount.text.trim();
+        user.tx.tokenAmountInWei = Web3.utils.toWei(user.tx.tokenAmount, 'ether');
+
+        const validateRes = await validate.validateBuy(user, user.tx.tokenAddressToBuyWith);
+        console.log(validateRes)
+        if (!validateRes.status) {
+            bot.sendMessage(chatId, validateRes.msg);
+        } else {
+            currentInlineKeyboard[1][0].text = `Amount: ${user.tx.tokenAmount}${user.nativeToken}`;
+
+            const newKeyboard = {
+                inline_keyboard: currentInlineKeyboard
+            }
+
+            bot.editMessageReplyMarkup(newKeyboard, {
+                chat_id: chatId,
+                message_id: oldMessageId
+            });
+        }
+    });
+}
+
+
+
+// =========== Sell Limit ================
 function inputSellLimitInfo(chatId) {
     const messageText = 'Please select information for selling token:';
 
     bot.sendMessage(chatId, messageText, { parse_mode: 'Markdown', reply_markup: keyboards.settingBuyLimitKeyboard });
 }
 
+// ============  Setting & Switching & Portfolio =============
 function setting(chatId) {
     const messageText = '⚙ User Settings ⚙';
 
