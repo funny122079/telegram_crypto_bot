@@ -9,80 +9,49 @@ const welcomeText = '*Welcome to CryptiboBot!*\n' +
         '#2. Use: /wallet to show all functions of your wallet\n' +
         '#3. Use: /network to switch the chain network - Ethereum, Polygon, Arbitrum';
 
-const inputPVTText = 'Please provide your Ethereum private key:';
-const inputTransferRecipientText= 'Please reply with the address to send:';
-const selectTokenToSell = 'Please select the Token Name to sell :';
-
-const walletMainText = (address, balance, nativeToken) => {
-    let message = '*~~~~~~~~~ Your Wallet ~~~~~~~~~*\n' + 
-        '*- Address:*' + address + '\n' + 
-        '*- Balance:* ' + balance + nativeToken + '\n';
-    return message;
-}
-
-const walletGeneratedText = (address) => {
-    let message = '*Wallet Generated Successfully!*\n' + 
-        '*- Address:*\n' + address + '\n\n' + 
-        'What do you want to do with the bot?';
-
-    return message;
-}
-
-const walletImportedText = (address, balance, nativeToken) => {
-    let message = `*Wallet imported successfully!\nAddress:* ${address}` +
-        '*- Balance:* ' + balance + nativeToken + '\n';
-
+const walletMainText = () => {
+    let message = '<b>Greetings, from the Cryptibo Trading Bot</b>\n\n' + 
+        'Cryptibo helps you to get the best benefits in the shortest period of time.\n' + 
+        '*<a href="http://example.com">Website</a> || <a href="http://example.com">Documentation</a> || <a href="http://example.com">Discussion</a>*';
     return message;
 }
 
 const chainNetSelectedText = (chain, env) => {
     let message = '*' + chain + ' network was selected successfully!*\n\n' + 
-        'You are in the *<' + env + '>* now.\n' +
-        'Please create or import wallet to use of this bot';
+        'You are in the *<' + env + '>* now.\n';
 
     return message;
 }
 
-const confirmTransferText = (nativeToken, amount, recipient) => {
-    let message = '*Confirm Transfer*\n Sending *<' + amount + nativeToken + '>* to *<' + recipient + '>*';
+
+const walletManageMainText = (user) => {
+    let message = '*Manage Wallets*\n' +
+        'To replace, regenerate or show the private key of a wallet, simply select which wallet you wish to manage using the buttons below.\n\n' +
+        '*Wallets*';
+
+    user.wallet.forEach(wallet => {
+        message = message + '\n' + wallet.walletId + '. ' +
+            wallet.publicAddress + '   ' +  wallet.balance;
+    });
     
+    message = message + '\n\n' + '*Select Option:*'
     return message;
 }
 
-const confirmSellText = (user) => {
-    let message = '*======= Please confirm the information ==========*\n' + 
-        '*Amount to sell: *' + Web3.utils.fromWei(user.tx.amountInWei, 'ether') + user.nativeToken + 
-        '\n*Receive Token: *' + user.tx.receiveToken + 
-        '\nDo you really approve this transaction?';
-
+const walletDeatilText = (wallet) => {
+    let message = '*Wallet Detail*\n\n' + 'Wallet:\n' + 
+        wallet.walletId + '. ' + wallet.publicAddress + '  ' + wallet.balance + 
+        '\n\n*Select Option:*';
     return message;
 }
 
-const confirmBuyText = (user) => {
-    let message = '*======= Please confirm the information ==========*' + 
-        '\n*Amount to Buy: *' + Web3.utils.fromWei(user.tx.amountInWei, 'ether') + user.nativeToken + 
-        '\n*Buy with: *' + user.tx.needTokenAmount + user.tx.buyWithToken + 
-        '\nDo you really buy token?';
+const showPrivateKeyText = (wallet) => {
+    let message = 'Here is the private key for this wallet:\n' +
+        'Do not share this with anyone, as it may lead to funds being stolen!\n\n' +
+        '*' + wallet.privateKey + '*';
 
     return message;
 }
-
-const pnlAnalysisText = (net, amount, nativeToken) => {
-    let message = 'Generating PnL!\n\n' + 
-        'You have not done a ny trades with the bot!\n\n' +
-        '*Chain Selected: *' + net + '\n\n' +
-        '*~~~ Profit & Loss (PnL) Analysis ~~~*\n' +
-        'Total PnL: ' + amount + nativeToken;
-
-    return message;
-}
-
-const inputTransferAmountText = (balance, nativeToken) => {
-    let message = 'Please reply with the amount to send:\n\n' +
-        '*MaxSendableAmount: *' + balance + ' ' + nativeToken;
-
-    return message;
-} 
 
 /////////////////////////////   Warning Messages  ////////////////////////////
 const warningAdditionalPay = '*~~~~~~~~  Warning!  ~~~~~~~~*\nYou must pay additional fee for using this.\n Please select other one.';
@@ -95,6 +64,6 @@ const warningBalance = 'Insufficient Balance! Please input amount again.';
 
 
 module.exports = {  
-    welcomeText, inputPVTText, inputTransferRecipientText, inputTransferAmountText, selectTokenToSell, warningAdditionalPay, warningWalletExisted, warningBalance,
-    walletMainText, walletGeneratedText, walletImportedText, chainNetSelectedText, confirmTransferText, confirmSellText, confirmBuyText, pnlAnalysisText 
+    welcomeText, warningWalletExisted, warningAdditionalPay, warningBalance,
+    walletMainText, chainNetSelectedText, walletManageMainText, walletDeatilText, showPrivateKeyText
 }
