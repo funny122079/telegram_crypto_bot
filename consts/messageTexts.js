@@ -53,6 +53,34 @@ const showPrivateKeyText = (wallet) => {
     return message;
 }
 
+const showPortfolioText = (user, wallet, portfolio) => {
+    let message = '*================ Wallet Assets ================*\n\n' +
+        '*Chain Network: *' + user.chainNetwork + '\n' +
+        '*Address: * ' + wallet.publicAddress + '\n' +
+        '*Balance: * ' + wallet.balance + user.nativeToken + '\n\n';
+
+    if (portfolio.length) {
+        message += '*Holding Token Balances:*\n';
+        portfolio.forEach(token => {
+            message = message + '     *' +  token.name + ':* ' + parseFloat(token.balance).toFixed(4) + token.symbol + '\n';
+        });
+    } else {
+        message = message + "⚠ There is no tokens holding in your wallet.\n";
+    }
+    return message;
+}
+
+const transferMainText = () => {
+    let message = '🚀* Transfer *\n' +
+        '*Chain Network: *' + 'Ethereum\n' +
+        '*Wallet Address: *' + '0x23a69ede7d15680e26fb05992355131f1b7dff14\n' +
+        '*Balance: *' + '0.0003ETH\n' +
+        '*Max Amount for Transfer: *' + '0.00023ETH\n' +
+        '*Estimated Fee: *' + '0.00007ETH';
+
+    return message;
+}
+
 /////////////////////////////   Warning Messages  ////////////////////////////
 const warningAdditionalPay = '*~~~~~~~~  Warning!  ~~~~~~~~*\nYou must pay additional fee for using this.\n Please select other one.';
 const warningWalletExisted = '*~~~~~~~~  Warning!  ~~~~~~~~*\nYou cannot use another wallet because you already have own wallet using on this platform.\n ';
@@ -65,5 +93,5 @@ const warningBalance = 'Insufficient Balance! Please input amount again.';
 
 module.exports = {  
     welcomeText, warningWalletExisted, warningAdditionalPay, warningBalance,
-    walletMainText, chainNetSelectedText, walletManageMainText, walletDeatilText, showPrivateKeyText
+    walletMainText, chainNetSelectedText, walletManageMainText, walletDeatilText, showPrivateKeyText, showPortfolioText, transferMainText
 }

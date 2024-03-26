@@ -39,6 +39,20 @@ const walletDetailMenuKeyboard = (walletId) => {
     }
 }
 
+const transferMainKeyboard = () => {
+    return {
+        inline_keyboard: [
+            [ { text: '~~~~~~~~~~ Recipient Address ~~~~~~~~~~', callback_data: 'nothing' } ],
+            [ { text: '🟢 W1', callback_data: 'transfer-receiver:w1' }, { text: 'W2', callback_data: 'transfer-receiver:w2' }, { text: 'W3', callback_data: 'transfer-receiver:w3' } ],
+            [ { text: 'Custom Wallet Address ✏', callback_data: 'transfer-receiver:custom' } ],
+            [ { text: '~~~~~~~~~~ Transfer Amount ~~~~~~~~~~', callback_data: 'nothing' } ],
+            [ { text: 'Half', callback_data: 'transfer-amount:' }, { text: 'Max', callback_data: 'nothing' }, { text: 'Custom', callback_data: 'nothing' } ],
+            [ { text: '✅ Confirm', callback_data: 'back-to:wallet-menu' }, { text: '❌ Cancel', callback_data: 'back-to:wallet-menu' } ],
+        ],
+    }
+}
+
+
 module.exports = { 
-    mainMenuKeyboard, selectNetKeyboard, settingMenuKeyboard, walletManageMainKeyboard, walletDetailMenuKeyboard 
+    mainMenuKeyboard, selectNetKeyboard, settingMenuKeyboard, walletManageMainKeyboard, walletDetailMenuKeyboard, transferMainKeyboard 
 }

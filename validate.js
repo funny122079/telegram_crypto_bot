@@ -14,7 +14,8 @@ let validateTokenAddress = async(user) => {
                 status: false,
                 msg: `Token contract at this address does not exist on the ${user.chainNetwork} network.`
             }
-        } else {
+        } 
+		else {
             return {
                 status: true,
                 msg: `Token contract at this address exists on the ${user.chainNetwork} network.`

@@ -127,6 +127,12 @@ bot.on('callback_query', (callbackQuery) => {
         case 'private-key':
             showPrivateKey(chatId, oldMessageId, param1);
             break;
+        case 'portfolio':
+            showPortfolio(chatId, oldMessageId, param1);
+            break;
+        case 'transfer-coin':
+            transferCoin(chatId, oldMessageId, param1);
+            break;
         default:
             break;
     }
@@ -155,7 +161,6 @@ function getUser(chatId) {
 function getWallet(user, walletId) {
     const wallet = user.wallet.find(wallet => wallet.walletId == walletId);
 
-    console.log("Selected Wallet: ", wallet);
     return wallet;
 }
 
@@ -291,4 +296,27 @@ function showPrivateKey(chatId, oldMessageId, walletId) {
         ],
     }
     bot.sendMessage(chatId, messageText, { parse_mode: 'Markdown', reply_markup: privateKeyboard } );
+}
+
+async function showPortfolio(chatId, oldMessageId, walletId) {
+    const user = getUser(chatId);
+    const wallet = getWallet(user, walletId);
+
+    const portfolio = await modules.portfolio(user, wallet);
+
+    const messageText = messages.showPortfolioText(user, wallet, portfolio);
+
+    const closeKeyboard = {
+        inline_keyboard: [
+            [ { text: '❎ Close', callback_data: 'delete-message' } ],
+        ],
+    }
+
+    bot.sendMessage(chatId, messageText, { parse_mode: 'Markdown', reply_markup: closeKeyboard } );
+}
+
+function transferCoin(chatId, oldMessageId, walletId) {
+    const messageText = messages.transferMainText();
+    
+    bot.sendMessage(chatId, messageText, { parse_mode: 'Markdown', reply_markup: keyboards.transferMainKeyboard() });
 }

@@ -56,10 +56,10 @@ let getTokenBalance = async(tokenContractAddress, user) => {
 }
 
 // get all token balances of current chain network at onece.
-let portfolio = async (user) => {
+let portfolio = async (user, wallet) => {
     const tokensInWallet = await axios.get(
         "https://deep-index.moralis.io/api/v2/" +
-        user.wallet.publicAddress +
+        wallet.publicAddress +
         "/erc20?chain=" + constants.chain[user.chainNetwork],
         {
             headers: {

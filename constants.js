@@ -35,7 +35,7 @@ module.exports = {
     }, 
     rpcUrls: {
         'mainnet': {
-            'Ethereum': 'https://mainnet.infura.io/v3/276601773a5841a29cd363a970f5a293',
+            'Ethereum': 'https://goerli.drpc.org/',
             'Polygon': 'https://polygon-mainnet.infura.io/v3/276601773a5841a29cd363a970f5a293',
             'Arbitrum': 'https://arbitrum-mainnet.infura.io/v3/276601773a5841a29cd363a970f5a293',
             'BSC': 'https://bsc-dataseed.binance.org/', 
